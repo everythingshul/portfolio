@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Contact — Everything Shul</title>
 <meta name="description" content="Tell Everything Shul about your organization and what you need built." />
-<link rel="icon" href="assets/logo.png" />
+<link rel="icon" href="assets/logo-light.png" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -14,7 +14,7 @@
 <div class="bg-glow"></div>
 
 <nav class="navbar">
-  <a href="index.html" class="brand"><img src="assets/logo.png" alt="Everything Shul" /></a>
+  <a href="index.html" class="brand"><img src="assets/logo-light.png" alt="Everything Shul" /></a>
   <div class="nav-links">
     <a href="index.html#showcase">Work</a>
     <a href="index.html#process">Process</a>
@@ -118,8 +118,11 @@
           <label for="message">Message</label>
           <textarea id="message" name="message" placeholder="What's slowing you down today?" required></textarea>
         </div>
+        <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0;">
         <button type="submit" class="btn-primary">Send message</button>
-        <div class="form-success">Thanks — your email app should now be open with your message ready to send.</div>
+        <div class="form-success">Thanks — your message is on its way. Check your inbox for a confirmation.
+        </div>
+        <div class="form-error" style="display:none;margin-top:16px;color:#f0a39a;font-size:0.88rem;"></div>
       </form>
     </div>
 
@@ -130,7 +133,7 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a href="index.html" class="brand"><img src="assets/logo.png" alt="Everything Shul" /></a>
+        <a href="index.html" class="brand"><img src="assets/logo-light.png" alt="Everything Shul" /></a>
         <p>We build the donor management, membership, ticketing and fundraising software behind thriving organizations.</p>
       </div>
       <div class="footer-col">

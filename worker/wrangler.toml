@@ -1,0 +1,13 @@
+name = "everythingshul-contact"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+TO_EMAIL = "everythingshul@gmail.com"
+# Must be a sender verified in Brevo (Senders, Domains & Dedicated IPs).
+SENDER_EMAIL = "everythingshul@gmail.com"
+SENDER_NAME = "Everything Shul"
+ALLOWED_ORIGINS = "https://everythingshul.com,https://www.everythingshul.com"
+SITE_URL = "https://everythingshul.com"
+
+# Secret (never committed): wrangler secret put BREVO_API_KEY
