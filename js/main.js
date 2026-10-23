@@ -134,30 +134,45 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ---------- contact form ---------- */
   const form = document.getElementById('contact-form');
   if (form) {
-    form.addEventListener('submit', (e) => {
+    const ENDPOINT = 'https://everythingshul-contact.everythingshul.workers.dev';
+    const success = document.querySelector('.form-success');
+    const error = document.querySelector('.form-error');
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const data = new FormData(form);
-      const name = (data.get('name') || '').toString();
-      const email = (data.get('email') || '').toString();
-      const org = (data.get('org') || '').toString();
-      const interest = (data.get('interest') || '').toString();
-      const message = (data.get('message') || '').toString();
-
-      const subject = `Project inquiry from ${name || 'your site'}`;
-      const bodyLines = [
-        `Name: ${name}`,
-        `Email: ${email}`,
-        org ? `Organization: ${org}` : null,
-        interest ? `Interested in: ${interest}` : null,
-        '',
-        message
-      ].filter(Boolean);
-
-      const mailto = `mailto:everythingshul@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines.join('\n'))}`;
-      window.location.href = mailto;
-
-      const success = document.querySelector('.form-success');
-      if (success) success.classList.add('show');
+      const btn = form.querySelector('button[type="submit"]');
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      if (error) error.style.display = 'none';
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(form)))
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'failed');
+        form.reset();
+        if (success) success.classList.add('show');
+      } catch (err) {
+        // Worker unreachable: fall back to the visitor's email app so the message is never lost.
+        const d = Object.fromEntries(new FormData(form));
+        const lines = [
+          `Name: ${d.name}`,
+          `Email: ${d.email}`,
+          d.org ? `Organization: ${d.org}` : null,
+          d.interest ? `Interested in: ${d.interest}` : null,
+          '',
+          d.message
+        ].filter((l) => l !== null);
+        window.location.href = `mailto:everythingshul@gmail.com?subject=${encodeURIComponent('Project inquiry from ' + (d.name || 'your site'))}&body=${encodeURIComponent(lines.join('\n'))}`;
+        if (error) {
+          error.textContent = 'Opening your email app so you can send it directly.';
+          error.style.display = 'block';
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = label;
+      }
     });
   }
 
