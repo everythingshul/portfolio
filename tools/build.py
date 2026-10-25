@@ -72,7 +72,7 @@ def og(title, desc, image, url):
 '''
 
 NAV = '''<nav class="navbar">
-  <a href="index.html" class="brand"><img src="assets/logo.png" alt="Everything Shul" /></a>
+  <a href="index.html" class="brand"><img src="assets/logo-light.png" alt="Everything Shul" /></a>
   <div class="nav-links">
     <a href="index.html#work">Work</a>
     <a href="index.html#process">Process</a>
@@ -101,7 +101,7 @@ def footer():
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a href="index.html" class="brand"><img src="assets/logo.png" alt="Everything Shul" /></a>
+        <a href="index.html" class="brand"><img src="assets/logo-light.png" alt="Everything Shul" /></a>
         <p>We build custom software for nonprofits.</p>
       </div>
       <div class="footer-col">
@@ -210,7 +210,7 @@ def index_html():
 <section id="work">
   <div class="container">
     <div class="work-head">
-      <h2>Six platforms, built from scratch.</h2>
+      <h2>Platforms built from scratch.</h2>
       <p>The software currently running organizations and businesses day to day.</p>
     </div>
 {projects}
@@ -353,7 +353,7 @@ def share_page(p):
 <html lang="en">
 <head>
 {head(title, desc, og(title, desc, p['id'] + '.jpg', url) + f'<link rel="canonical" href="{url}" />' + chr(10) + f'<meta http-equiv="refresh" content="0;url=/#{p["id"]}" />')}
-<style>body{{font:16px/1.5 system-ui,sans-serif;padding:40px;color:#101c33;background:#f4f1e9}}</style>
+<style>body{{font:16px/1.5 system-ui,sans-serif;padding:40px;color:#f4f7fc;background:#0a0f1a}}</style>
 </head>
 <body>
 <p>Taking you to <a href="/#{p['id']}">{e(p['full'])}</a>…</p>
