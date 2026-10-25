@@ -20,18 +20,18 @@ const css = `
 @font-face{font-family:N;src:url(${url('assets/fonts/newsreader.woff2')});font-weight:400 600}
 @font-face{font-family:S;src:url(${url('assets/fonts/instrument-sans.woff2')});font-weight:400 600}
 *{box-sizing:border-box;margin:0;padding:0}
-body{width:1200px;height:630px;background:#f4f1e9;color:#101c33;font-family:S,sans-serif;position:relative;overflow:hidden}
+body{width:1200px;height:630px;background:#0a0f1a;color:#f4f7fc;font-family:S,sans-serif;position:relative;overflow:hidden}
 .logo{position:absolute;left:64px;top:56px;height:62px}
 .text{position:absolute;left:64px;right:690px;top:190px}
-.kind{font-size:22px;letter-spacing:.06em;text-transform:uppercase;color:#78819a;margin-bottom:18px}
+.kind{font-size:22px;letter-spacing:.06em;text-transform:uppercase;color:#7d8aab;margin-bottom:18px}
 h1{font-family:N,serif;font-weight:400;font-size:86px;line-height:1.02;letter-spacing:-.02em}
-.url{position:absolute;left:64px;bottom:52px;font-size:24px;color:#0b7fb8}
-.frame{position:absolute;left:560px;top:150px;width:576px;height:324px;border:2px solid #101c33;border-radius:6px;background-color:#ebe7dc;background-repeat:no-repeat;background-size:cover}
-.rule{position:absolute;left:64px;right:64px;bottom:108px;height:1px;background:#d8d2c3}
+.url{position:absolute;left:64px;bottom:52px;font-size:24px;color:#6fd0ff}
+.frame{position:absolute;left:560px;top:150px;width:576px;height:324px;border:2px solid #3a4766;border-radius:6px;background-color:#0d1526;background-repeat:no-repeat;background-size:cover}
+.rule{position:absolute;left:64px;right:64px;bottom:108px;height:1px;background:#1f2a45}
 `;
 
 const page = (inner) => `<!doctype html><meta charset="utf-8"><style>${css}</style><body>${inner}</body>`;
-const logo = `<img class="logo" src="${url('assets/logo.png')}">`;
+const logo = `<img class="logo" src="${url('assets/logo-light.png')}">`;
 
 const projectCard = (p) => page(`${logo}
 <div class="text"><div class="kind">${p.kind}</div><h1 style="${p.name.length > 14 ? 'font-size:68px' : ''}">${p.name}</h1></div>
@@ -41,7 +41,7 @@ const projectCard = (p) => page(`${logo}
 const homeCard = () => {
   const cells = projects.map((p, i) => {
     const col = i % 3, row = Math.floor(i / 3);
-    return `<div style="position:absolute;left:${560 + col * 196}px;top:${150 + row * 168}px;width:184px;height:104px;border:2px solid #101c33;border-radius:5px;background:#ebe7dc url(${url(p.img)}) ${p.pos}/cover no-repeat"></div>`;
+    return `<div style="position:absolute;left:${560 + col * 196}px;top:${150 + row * 168}px;width:184px;height:104px;border:2px solid #3a4766;border-radius:5px;background:#0d1526 url(${url(p.img)}) ${p.pos}/cover no-repeat"></div>`;
   }).join('');
   return page(`${logo}
 <div class="text" style="right:660px"><h1 style="font-size:78px">We build custom software for nonprofits.</h1></div>
