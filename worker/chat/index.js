@@ -307,6 +307,7 @@ async function admin(request, url, env, h) {
       await brevo(env, {
         to: [{ email: conv.email, name: conv.name || conv.email }],
         replyTo: { email: env.ADMIN_EMAIL, name: env.SENDER_NAME },
+        bcc: [{ email: env.ADMIN_EMAIL }], // keep a copy of every answer in the team inbox
         subject: 'Reply from Everything Shul',
         htmlContent: customerReply(conv, text, chatLink(env, conv.id), env.SITE_URL),
       });

@@ -130,8 +130,9 @@ and footer.
 3. **Contact emails:** `worker/` (Cloudflare Worker + Brevo) is written but only works once it is deployed.
    Use `tools/deploy-workers.sh` (needs CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in the environment);
    the client types BREVO_API_KEY (both Workers) and ADMIN_TOKEN (chat) directly into Cloudflare's dashboard as
-   Worker secrets, so they never pass through Claude. Use a sender on an authenticated everythingshul.com
-   domain in Brevo (SENDER_EMAIL in both wrangler.toml files). Until then the form falls
+   Worker secrets, so they never pass through Claude. Emails are sent from support@mail.everythingshul.com (the
+   mail.everythingshul.com domain must be authenticated in Brevo; SENDER_EMAIL in both wrangler.toml files).
+   Every email sets Reply-To to the Gmail inbox, and the team's chat replies are BCC'd there too. Until then the form falls
    back to opening the visitor's email app. If the Worker URL differs from the guess in
    `ENDPOINT` in `js/main.js`, update it.
 4. **Logo:** `assets/logo.png` is the sharp logo taken from kipashairbp.org's footer.

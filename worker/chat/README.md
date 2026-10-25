@@ -35,7 +35,7 @@ Settings -> Variables and Secrets -> Add (type Secret). Contact Worker: `BREVO_A
 
 ## One-time setup by hand (about 10 minutes)
 
-1. Make sure the Brevo sender address is verified (same one the contact form uses).
+1. In Brevo, authenticate the domain `mail.everythingshul.com` and use `support@mail.everythingshul.com` as the sender (already set in `wrangler.toml`).
 2. From this folder:
    ```
    npx wrangler login

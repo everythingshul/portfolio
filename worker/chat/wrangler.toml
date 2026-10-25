@@ -5,9 +5,10 @@ compatibility_date = "2025-01-01"
 [vars]
 ALLOWED_ORIGINS = "https://everythingshul.com,https://www.everythingshul.com"
 SITE_URL = "https://everythingshul.com"
-# Where chat requests are sent, and who they reply as. SENDER_EMAIL must be verified in Brevo.
+# ADMIN_EMAIL is the inbox that gets every chat notification (and a copy of each reply sent to a visitor).
+# SENDER_EMAIL must be on the domain authenticated in Brevo (mail.everythingshul.com).
 ADMIN_EMAIL = "everythingshul@gmail.com"
-SENDER_EMAIL = "everythingshul@gmail.com"
+SENDER_EMAIL = "support@mail.everythingshul.com"
 SENDER_NAME = "Everything Shul"
 
 # Conversation storage. Create it once with:  npx wrangler kv namespace create CHAT
