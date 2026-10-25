@@ -25,7 +25,15 @@ Chesky also learns, but only what the team approves:
 - Taught answers take priority over his built-in ones, so you can also fix an answer people don't like.
 - Only replies sent from the admin page are seen by the system. Replying from Gmail directly won't teach him.
 
-## One-time setup (about 10 minutes)
+## Easiest way to set it up
+
+`tools/deploy-workers.sh` deploys both Workers (contact form and chat), creates the storage, and points the
+site at them. It needs only `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The Brevo key and the admin
+password are typed straight into Cloudflare, never into a script or chat: Workers & Pages -> the Worker ->
+Settings -> Variables and Secrets -> Add (type Secret). Contact Worker: `BREVO_API_KEY`. Chat Worker:
+`BREVO_API_KEY` and `ADMIN_TOKEN`.
+
+## One-time setup by hand (about 10 minutes)
 
 1. Make sure the Brevo sender address is verified (same one the contact form uses).
 2. From this folder:

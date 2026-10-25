@@ -127,8 +127,11 @@ and footer.
 2. **Domain:** `everythingshul.com` is registered at Squarespace Domains (nameservers
    `*.squarespacedns.com`) and points at GitHub Pages via the four `185.199.108-111.153` A records
    plus a `www` CNAME to `everythingshul.github.io`. Do not re-add the old Wix records.
-3. **Contact emails:** `worker/` (Cloudflare Worker + Brevo) is written but only works once the
-   client deploys it with their Brevo API key (see `worker/README.md`). Until then the form falls
+3. **Contact emails:** `worker/` (Cloudflare Worker + Brevo) is written but only works once it is deployed.
+   Use `tools/deploy-workers.sh` (needs CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in the environment);
+   the client types BREVO_API_KEY (both Workers) and ADMIN_TOKEN (chat) directly into Cloudflare's dashboard as
+   Worker secrets, so they never pass through Claude. Use a sender on an authenticated everythingshul.com
+   domain in Brevo (SENDER_EMAIL in both wrangler.toml files). Until then the form falls
    back to opening the visitor's email app. If the Worker URL differs from the guess in
    `ENDPOINT` in `js/main.js`, update it.
 4. **Logo:** `assets/logo.png` is the sharp logo taken from kipashairbp.org's footer.
