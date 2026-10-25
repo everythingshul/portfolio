@@ -1,0 +1,10 @@
+name = "everythingshul-chat"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://everythingshul.com,https://www.everythingshul.com"
+# Model used for answers. Swap for "claude-haiku-5-5" to cut the per-chat cost a lot.
+MODEL = "claude-opus-5-5"
+
+# Secret (never committed): npx wrangler secret put ANTHROPIC_API_KEY
