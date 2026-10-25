@@ -995,5 +995,9 @@ h1, h2, h3, h4 {
   .field-row { grid-template-columns: 1fr; }
   .cta-band { padding: 48px 26px; }
   .hero { padding: 70px 0 40px; }
-  .scroll-window, .video-stage { height: 240px; }
+  .scroll-window { height: 240px; }
+  .video-stage { height: auto; aspect-ratio: 16 / 9; }
+  .play-full { white-space: nowrap; padding: 9px 16px 9px 11px; font-size: 0.8rem; gap: 8px; }
+  .play-full .play-icon { width: 26px; height: 26px; }
+  .brand img { height: 38px; }
 }
