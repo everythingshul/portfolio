@@ -1,8 +1,1 @@
-{
-  "name": "everythingshul-chat",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@anthropic-ai/sdk": "latest"
-  }
-}
+{ "type": "module" }
