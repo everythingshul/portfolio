@@ -82,10 +82,10 @@ preview and poster*, but the full unedited tour video (used only on explicit cli
 full tour") was left intact since it's the client's own footage and their call to include it.
 If asked to change the preview/poster segments, keep this PII consideration in mind.
 
-Video processing was done with ffmpeg: full tours re-encoded to 1280px/libx264/crf26/faststart
-(no audio stripped from the *preview* loop only — the full tour keeps nothing special, it's
-just re-encoded video, originals had no separate audio track of note), preview loops are a
-~12s trimmed/scaled/muted clip, posters are single high-quality extracted frames.
+Full tour videos (`*-tour.mp4`, all four products) are the client's original recordings with
+sound, used unedited (1920x1080, AAC audio) — do not re-encode or trim them; re-encoding earlier
+stripped the audio. Only the silent ~12s preview loops (`*-preview.mp4`, DRM/Kipas/Kupes) and
+the poster frames were generated with ffmpeg.
 
 ## Logo
 
