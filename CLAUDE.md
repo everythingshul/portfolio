@@ -46,7 +46,7 @@ non-profits") — all were explicitly removed per client request. Don't reintrod
 2. **Kipas Hair BP** (`kipashairbp.org`, admin at `ecards.kipashairbp.org`) — gift-card assistance
    platform (shul registration, applicant approval, prepaid cards, store spend). Has a real
    video showcase.
-3. **Kupes Hair Williamsburg** (`ecards.kupeshair.org`) — a *separate, distinct* white-labeled
+3. **Kupes Hair Williamsburg** (`kupeshair.org`) — a *separate, distinct* white-labeled
    deployment of the same gift-card platform as #2, for a different client/org. Treated as its
    own 6th showcase card, not merged into Kipas Hair BP's card — the client was explicit about
    this. Has a real video showcase. Marked with a small "NEW" badge.
