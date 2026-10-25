@@ -3,318 +3,279 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Everything Shul — Software for thriving organizations</title>
+<title>Everything Shul — Custom software for nonprofits</title>
 <meta name="description" content="Everything Shul builds custom software for nonprofits." />
-<link rel="icon" href="favicon.ico" sizes="any" />
-<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Everything Shul" />
+<meta property="og:title" content="Everything Shul — Custom software for nonprofits" />
+<meta property="og:description" content="Everything Shul builds custom software for nonprofits." />
+<meta property="og:url" content="https://everythingshul.com/" />
+<meta property="og:image" content="https://everythingshul.com/assets/share/home.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Everything Shul — Custom software for nonprofits" />
+<meta name="twitter:description" content="Everything Shul builds custom software for nonprofits." />
+<meta name="twitter:image" content="https://everythingshul.com/assets/share/home.jpg" />
 <link rel="stylesheet" href="css/style.css" />
+<link rel="preload" href="assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin />
 </head>
 <body>
 
-<div class="bg-grid"></div>
-<div class="bg-glow"></div>
-
 <nav class="navbar">
-  <a href="index.html" class="brand"><img src="assets/logo-light.png" alt="Everything Shul" /></a>
+  <a href="index.html" class="brand"><img src="assets/logo.png" alt="Everything Shul" /></a>
   <div class="nav-links">
-    <a href="index.html#showcase">Work</a>
+    <a href="index.html#work">Work</a>
     <a href="index.html#process">Process</a>
     <a href="index.html#about">About</a>
     <a href="contact.html">Contact</a>
   </div>
   <div class="nav-cta">
-    <a href="contact.html" class="btn-ghost">Start a project</a>
+    <a href="contact.html" class="btn">Start a project</a>
     <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
   </div>
 </nav>
 
 <div class="nav-scrim"></div>
 <div class="mobile-nav">
-  <a href="index.html#showcase">Work</a>
+  <a href="index.html#work">Work</a>
   <a href="index.html#process">Process</a>
   <a href="index.html#about">About</a>
   <a href="contact.html">Contact</a>
-  <a href="contact.html" class="btn-primary" style="margin-top:10px;">Start a project</a>
+  <a href="contact.html" class="btn">Start a project</a>
 </div>
 
 <header class="hero">
   <div class="container">
-    <h1>We build the software behind thriving organizations.</h1>
+    <h1>We build the software behind <em>thriving</em> organizations.</h1>
     <p class="lede">We build custom software for nonprofits.</p>
     <div class="hero-actions">
-      <a href="contact.html" class="btn-primary">Start a project</a>
-      <a href="index.html#showcase" class="btn-ghost">See our work</a>
+      <a href="contact.html" class="btn">Start a project</a>
+      <a href="#work" class="btn-line">See our work</a>
     </div>
+    <ol class="index" aria-label="Projects">
+      <li><a href="#drm"><span class="n">01</span><span class="name">DRM</span><span class="kind">Donor management</span><span class="go" aria-hidden="true">↓</span></a></li>
+      <li><a href="#kipashairbp"><span class="n">02</span><span class="name">Kipas Hair BP</span><span class="kind">Gift card assistance platform</span><span class="go" aria-hidden="true">↓</span></a></li>
+      <li><a href="#kupeshair"><span class="n">03</span><span class="name">Kupes Hair Williamsburg</span><span class="kind">Gift card assistance platform</span><span class="go" aria-hidden="true">↓</span></a></li>
+      <li><a href="#jlistings"><span class="n">04</span><span class="name">JListings</span><span class="kind">Organization classifieds</span><span class="go" aria-hidden="true">↓</span></a></li>
+      <li><a href="#mamudem"><span class="n">05</span><span class="name">Mamudem</span><span class="kind">Event ticketing</span><span class="go" aria-hidden="true">↓</span></a></li>
+      <li><a href="#fundraise"><span class="n">06</span><span class="name">Fundraise Wall</span><span class="kind">Live fundraising</span><span class="go" aria-hidden="true">↓</span></a></li>
+    </ol>
   </div>
 </header>
 
-<section id="about" class="value-section">
-  <div class="container">
-    <div class="value-grid">
-      <div class="value-card reveal">
-        <div class="value-icon">◆</div>
-        <h3>Purpose-built, not repurposed</h3>
-        <p>Every platform is designed around how your organization actually runs — not bent out of shape from generic software.</p>
-      </div>
-      <div class="value-card reveal reveal-delay-1">
-        <div class="value-icon">◇</div>
-        <h3>Built with care for organizations</h3>
-        <p>We work closely with the people running the organization so the software fits the community it serves.</p>
-      </div>
-      <div class="value-card reveal reveal-delay-2">
-        <div class="value-icon">○</div>
-        <h3>Reliable, end to end</h3>
-        <p>From the first mockup to day-to-day support, we stay with every platform we build.</p>
-      </div>
+<section id="about" class="about">
+  <div class="container about-grid">
+    <h2>Software that fits the way your organization works.</h2>
+    <div class="about-points">
+      <p><strong>Built around how you run.</strong>Every platform is designed around how your organization actually operates, not bent out of shape from generic software.</p>
+      <p><strong>Made with the people who use it.</strong>We work closely with the people running the organization, so the software fits the way it's run day to day.</p>
+      <p><strong>Supported after launch.</strong>From the first mockup to day-to-day support, we stay with every platform we build.</p>
     </div>
   </div>
 </section>
 
-<section id="showcase" class="showcase-section">
+<section id="work">
   <div class="container">
-
-    <div class="section-head reveal">
-      <span class="eyebrow">Our work</span>
+    <div class="work-head">
       <h2>Six platforms, built from scratch.</h2>
-      <p>A look at the software currently running organizations and businesses day to day.</p>
+      <p>The software currently running organizations and businesses day to day.</p>
     </div>
 
-    <!-- DRM -->
-    <article class="showcase-card reveal">
-      <div class="showcase-copy">
-        <span class="showcase-tag">Donor Management</span>
-        <h3>DRM — Donor Relationship Manager</h3>
-        <p>An all-in-one donor CRM built for shuls — live totals, recurring charge batches, follow-ups, Hebrew kvitel generation and templated receipts, all in one dashboard.</p>
-        <ul class="feature-list">
+    <section class="project" id="drm">
+      <div class="project-grid">
+        <div class="project-text">
+          <p class="kicker"><span class="n">01</span>Donor management</p>
+          <h3>DRM</h3>
+          <p>An all-in-one donor CRM built for shuls — live totals, recurring charge batches, follow-ups, Hebrew kvitel generation and templated receipts, all in one dashboard.</p>
+          <ul class="features">
           <li>Live donor &amp; donation dashboard</li>
           <li>Recurring charge batch review</li>
           <li>Hebrew/English kvitel generator</li>
           <li>Drag-and-drop email &amp; receipt designer</li>
-        </ul>
-        <div class="showcase-links">
-          <a href="https://drm.everythingshul.com" target="_blank" rel="noopener" class="btn-small">Visit drm.<wbr>everythingshul.com ↗</a>
-        </div>
-      </div>
-      <div class="showcase-media">
-        <div class="video-frame">
-          <div class="browser-topbar">
-            <div class="browser-dots"><span></span><span></span><span></span></div>
-            <div class="browser-url">drm.everythingshul.com</div>
+          </ul>
+          <div class="actions">
+            <a href="https://drm.everythingshul.com" target="_blank" rel="noopener" class="btn">Visit site ↗</a>
+            <button type="button" class="btn-line share-btn" data-id="drm" data-title="DRM — Donor Relationship Manager — Everything Shul" data-text="DRM — Donor Relationship Manager, built by Everything Shul: donor management."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span>Share</span></button>
           </div>
-          <div class="video-stage">
+        </div>
+        <figure class="project-media">
+          <div class="frame video-stage">
             <video class="preview-video" src="assets/video/drm-preview.mp4" poster="assets/video/drm-poster.jpg" muted loop playsinline preload="none"></video>
-            <span class="video-caption"><span class="dot"></span>Product tour</span>
-            <button class="play-full" data-video="assets/video/drm-tour.mp4" data-title="DRM — Full product tour">
-              <span class="play-icon"><svg viewBox="0 0 12 14" fill="#061120"><path d="M0 0 12 7 0 14Z"/></svg></span>
+            <button class="play-full" data-video="assets/video/drm-tour.mp4" data-title="DRM — full product tour">
+              <span class="play-icon"><svg viewBox="0 0 12 14" aria-hidden="true"><path d="M0 0 12 7 0 14Z"/></svg></span>
               Watch full tour
             </button>
           </div>
-        </div>
+          <figcaption>drm.everythingshul.com</figcaption>
+        </figure>
       </div>
-    </article>
+    </section>
 
-    <!-- Kipas Hair BP -->
-    <article class="showcase-card reverse reveal">
-      <div class="showcase-copy">
-        <span class="showcase-tag">Gift Card Assistance Platform</span>
-        <h3>Kipas Hair BP</h3>
-        <p>A full gift-card assistance platform — shul registration, applicant approval, prepaid card activation and live store spend tracking for an entire season.</p>
-        <ul class="feature-list">
+    <section class="project flip" id="kipashairbp">
+      <div class="project-grid">
+        <div class="project-text">
+          <p class="kicker"><span class="n">02</span>Gift card assistance platform</p>
+          <h3>Kipas Hair BP</h3>
+          <p>A full gift-card assistance platform — shul registration, applicant approval, prepaid card activation and live store spend tracking for an entire season.</p>
+          <ul class="features">
           <li>Shul &amp; applicant registration flow</li>
           <li>Approval &amp; verification pipeline</li>
           <li>Prepaid card loading &amp; activation</li>
           <li>Live store spend &amp; balance tracking</li>
-        </ul>
-        <div class="showcase-links">
-          <a href="https://kipashairbp.org" target="_blank" rel="noopener" class="btn-small">Visit kipashairbp.org ↗</a>
-        </div>
-      </div>
-      <div class="showcase-media">
-        <div class="video-frame">
-          <div class="browser-topbar">
-            <div class="browser-dots"><span></span><span></span><span></span></div>
-            <div class="browser-url">ecards.kipashairbp.org</div>
+          </ul>
+          <div class="actions">
+            <a href="https://kipashairbp.org" target="_blank" rel="noopener" class="btn">Visit site ↗</a>
+            <button type="button" class="btn-line share-btn" data-id="kipashairbp" data-title="Kipas Hair BP — Everything Shul" data-text="Kipas Hair BP, built by Everything Shul: gift card assistance platform."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span>Share</span></button>
           </div>
-          <div class="video-stage">
+        </div>
+        <figure class="project-media">
+          <div class="frame video-stage">
             <video class="preview-video" src="assets/video/kipashairbp-preview.mp4" poster="assets/video/kipashairbp-poster.jpg" muted loop playsinline preload="none"></video>
-            <span class="video-caption"><span class="dot"></span>Product tour</span>
-            <button class="play-full" data-video="assets/video/kipashairbp-tour.mp4" data-title="Kipas Hair BP — Full product tour">
-              <span class="play-icon"><svg viewBox="0 0 12 14" fill="#061120"><path d="M0 0 12 7 0 14Z"/></svg></span>
+            <button class="play-full" data-video="assets/video/kipashairbp-tour.mp4" data-title="Kipas Hair BP — full product tour">
+              <span class="play-icon"><svg viewBox="0 0 12 14" aria-hidden="true"><path d="M0 0 12 7 0 14Z"/></svg></span>
               Watch full tour
             </button>
           </div>
-        </div>
+          <figcaption>ecards.kipashairbp.org</figcaption>
+        </figure>
       </div>
-    </article>
+    </section>
 
-    <!-- Kupes Hair Williamsburg (new) -->
-    <article class="showcase-card reveal">
-      <div class="showcase-copy">
-        <span class="showcase-tag">Gift Card Assistance Platform<span class="badge-new">NEW</span></span>
-        <h3>Kupes Hair Williamsburg</h3>
-        <p>A dedicated, white-labeled deployment of our gift-card assistance platform for Kupes Hair Williamsburg — its own branding, admin, registration flow and season financials.</p>
-        <ul class="feature-list">
+    <section class="project" id="kupeshair">
+      <div class="project-grid">
+        <div class="project-text">
+          <p class="kicker"><span class="n">03</span>Gift card assistance platform<span class="new">New</span></p>
+          <h3>Kupes Hair Williamsburg</h3>
+          <p>A dedicated, white-labeled deployment of our gift-card assistance platform for Kupes Hair Williamsburg — its own branding, admin, registration flow and season financials.</p>
+          <ul class="features">
           <li>Branded shul &amp; applicant registration</li>
           <li>Dedicated admin dashboard</li>
           <li>Card loading &amp; account activation</li>
           <li>Season-by-season spend reporting</li>
-        </ul>
-        <div class="showcase-links">
-          <a href="https://kupeshair.org" target="_blank" rel="noopener" class="btn-small">Visit kupeshair.org ↗</a>
-        </div>
-      </div>
-      <div class="showcase-media">
-        <div class="video-frame">
-          <div class="browser-topbar">
-            <div class="browser-dots"><span></span><span></span><span></span></div>
-            <div class="browser-url">kupeshair.org</div>
+          </ul>
+          <div class="actions">
+            <a href="https://kupeshair.org" target="_blank" rel="noopener" class="btn">Visit site ↗</a>
+            <button type="button" class="btn-line share-btn" data-id="kupeshair" data-title="Kupes Hair Williamsburg — Everything Shul" data-text="Kupes Hair Williamsburg, built by Everything Shul: gift card assistance platform."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span>Share</span></button>
           </div>
-          <div class="video-stage">
+        </div>
+        <figure class="project-media">
+          <div class="frame video-stage">
             <video class="preview-video" src="assets/video/kupeshair-preview.mp4" poster="assets/video/kupeshair-poster.jpg" muted loop playsinline preload="none"></video>
-            <span class="video-caption"><span class="dot"></span>Product tour</span>
-            <button class="play-full" data-video="assets/video/kupeshair-tour.mp4" data-title="Kupes Hair Williamsburg — Full product tour">
-              <span class="play-icon"><svg viewBox="0 0 12 14" fill="#061120"><path d="M0 0 12 7 0 14Z"/></svg></span>
+            <button class="play-full" data-video="assets/video/kupeshair-tour.mp4" data-title="Kupes Hair Williamsburg — full product tour">
+              <span class="play-icon"><svg viewBox="0 0 12 14" aria-hidden="true"><path d="M0 0 12 7 0 14Z"/></svg></span>
               Watch full tour
             </button>
           </div>
-        </div>
+          <figcaption>kupeshair.org</figcaption>
+        </figure>
       </div>
-    </article>
+    </section>
 
-    <!-- JListings -->
-    <article class="showcase-card reverse reveal">
-      <div class="showcase-copy">
-        <span class="showcase-tag">Organization Classifieds</span>
-        <h3>JListings</h3>
-        <p>A classifieds and editorial platform built for organizations — listings, categories and community content in one searchable hub.</p>
-        <ul class="feature-list">
+    <section class="project flip" id="jlistings">
+      <div class="project-grid">
+        <div class="project-text">
+          <p class="kicker"><span class="n">04</span>Organization classifieds</p>
+          <h3>JListings</h3>
+          <p>A classifieds and editorial platform built for organizations — listings, categories and announcements in one searchable hub.</p>
+          <ul class="features">
           <li>Searchable classifieds &amp; categories</li>
           <li>Editorial &amp; announcement posts</li>
           <li>Organization-run moderation</li>
           <li>Mobile-first browsing</li>
-        </ul>
-        <div class="showcase-links">
-          <a href="https://jlistings.com" target="_blank" rel="noopener" class="btn-small">Visit jlistings.com ↗</a>
-        </div>
-      </div>
-      <div class="showcase-media">
-        <div class="browser-frame">
-          <div class="browser-topbar">
-            <div class="browser-dots"><span></span><span></span><span></span></div>
-            <div class="browser-url">jlistings.com</div>
-          </div>
-          <div class="scroll-window">
-              <div class="fallback"><div class="initial">J</div>JListings</div>
-              <img src="assets/screenshots/jlistings-full.png" alt="JListings organization classifieds screenshot" loading="lazy">
+          </ul>
+          <div class="actions">
+            <a href="https://jlistings.com" target="_blank" rel="noopener" class="btn">Visit site ↗</a>
+            <button type="button" class="btn-line share-btn" data-id="jlistings" data-title="JListings — Everything Shul" data-text="JListings, built by Everything Shul: organization classifieds."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span>Share</span></button>
           </div>
         </div>
+        <figure class="project-media">
+          <div class="frame scroll-window">
+            <img src="assets/screenshots/jlistings-full.png" alt="JListings classifieds site" loading="lazy" />
+          </div>
+          <figcaption>jlistings.com</figcaption>
+        </figure>
       </div>
-    </article>
+    </section>
 
-    <!-- Mamudem -->
-    <article class="showcase-card reveal">
-      <div class="showcase-copy">
-        <span class="showcase-tag">Event Ticketing</span>
-        <h3>Mamudem</h3>
-        <p>An event and dinner-ticketing platform — pricing tiers, check-in scanning and a live attendee list, built for organization dinners and events.</p>
-        <ul class="feature-list">
+    <section class="project" id="mamudem">
+      <div class="project-grid">
+        <div class="project-text">
+          <p class="kicker"><span class="n">05</span>Event ticketing</p>
+          <h3>Mamudem</h3>
+          <p>An event and dinner-ticketing platform — pricing tiers, check-in scanning and a live attendee list, built for organization dinners and events.</p>
+          <ul class="features">
           <li>Flexible pricing &amp; tiers</li>
           <li>QR check-in scanner</li>
           <li>Live attendee management</li>
           <li>Online ticket purchasing</li>
-        </ul>
-        <div class="showcase-links">
-          <a href="https://mamudem.com" target="_blank" rel="noopener" class="btn-small">Visit mamudem.com ↗</a>
-        </div>
-      </div>
-      <div class="showcase-media">
-        <div class="video-frame">
-          <div class="browser-topbar">
-            <div class="browser-dots"><span></span><span></span><span></span></div>
-            <div class="browser-url">mamudem.com</div>
+          </ul>
+          <div class="actions">
+            <a href="https://mamudem.com" target="_blank" rel="noopener" class="btn">Visit site ↗</a>
+            <button type="button" class="btn-line share-btn" data-id="mamudem" data-title="Mamudem — Everything Shul" data-text="Mamudem, built by Everything Shul: event ticketing."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span>Share</span></button>
           </div>
-          <div class="video-stage">
+        </div>
+        <figure class="project-media">
+          <div class="frame video-stage">
             <video class="preview-video" src="assets/video/mamudem-tour.mp4" poster="assets/video/mamudem-poster.jpg" muted loop playsinline preload="none"></video>
-            <span class="video-caption"><span class="dot"></span>Product tour</span>
-            <button class="play-full" data-video="assets/video/mamudem-tour.mp4" data-title="Mamudem — Full product tour">
-              <span class="play-icon"><svg viewBox="0 0 12 14" fill="#061120"><path d="M0 0 12 7 0 14Z"/></svg></span>
+            <button class="play-full" data-video="assets/video/mamudem-tour.mp4" data-title="Mamudem — full product tour">
+              <span class="play-icon"><svg viewBox="0 0 12 14" aria-hidden="true"><path d="M0 0 12 7 0 14Z"/></svg></span>
               Watch full tour
             </button>
           </div>
-        </div>
+          <figcaption>mamudem.com</figcaption>
+        </figure>
       </div>
-    </article>
+    </section>
 
-    <!-- Fundraise Wall -->
-    <article class="showcase-card reverse reveal">
-      <div class="showcase-copy">
-        <span class="showcase-tag">Live Fundraising</span>
-        <h3>Fundraise Wall</h3>
-        <p>A live fundraising wall and dashboard — real-time donations displayed for the room, with full admin controls behind the scenes.</p>
-        <ul class="feature-list">
+    <section class="project flip" id="fundraise">
+      <div class="project-grid">
+        <div class="project-text">
+          <p class="kicker"><span class="n">06</span>Live fundraising</p>
+          <h3>Fundraise Wall</h3>
+          <p>A live fundraising wall and dashboard — real-time donations displayed for the room, with full admin controls behind the scenes.</p>
+          <ul class="features">
           <li>Real-time donation wall display</li>
           <li>Campaign dashboard</li>
           <li>Donor &amp; pledge tracking</li>
           <li>Built-in contact &amp; follow-up tools</li>
-        </ul>
-        <div class="showcase-links">
-          <a href="https://fundraise.everythingshul.com" target="_blank" rel="noopener" class="btn-small">Visit fundraise.<wbr>everythingshul.com ↗</a>
-        </div>
-      </div>
-      <div class="showcase-media">
-        <div class="browser-frame">
-          <div class="browser-topbar">
-            <div class="browser-dots"><span></span><span></span><span></span></div>
-            <div class="browser-url">fundraise.everythingshul.com</div>
-          </div>
-          <div class="scroll-window">
-              <div class="fallback"><div class="initial">F</div>Fundraise Wall</div>
-              <img src="assets/screenshots/fundraise-full.png" alt="Fundraise Wall live donor display screenshot" loading="lazy">
+          </ul>
+          <div class="actions">
+            <a href="https://fundraise.everythingshul.com" target="_blank" rel="noopener" class="btn">Visit site ↗</a>
+            <button type="button" class="btn-line share-btn" data-id="fundraise" data-title="Fundraise Wall — Everything Shul" data-text="Fundraise Wall, built by Everything Shul: live fundraising."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span>Share</span></button>
           </div>
         </div>
+        <figure class="project-media">
+          <div class="frame scroll-window">
+            <img src="assets/screenshots/fundraise-full.png" alt="Fundraise Wall live donor display" loading="lazy" />
+          </div>
+          <figcaption>fundraise.everythingshul.com</figcaption>
+        </figure>
       </div>
-    </article>
-
+    </section>
   </div>
 </section>
 
-<section id="process" class="process-section">
+<section id="process" class="process">
+  <div class="container process-grid">
+    <h2>From first conversation to day-to-day support.</h2>
+    <ol class="steps">
+      <li><span class="n">01</span><h3>Discover</h3><p>We learn how your organization actually runs before writing a line of code.</p></li>
+      <li><span class="n">02</span><h3>Design</h3><p>A clear interface designed around your people, not a generic template.</p></li>
+      <li><span class="n">03</span><h3>Build</h3><p>We build and test the platform end to end, with you involved at every step.</p></li>
+      <li><span class="n">04</span><h3>Support</h3><p>Launch day is day one. We stay on to support, refine and extend the platform.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="cta">
   <div class="container">
-    <div class="section-head center reveal">
-      <span class="eyebrow">How we work</span>
-      <h2>From first conversation to day-to-day support.</h2>
-    </div>
-    <div class="process-grid">
-      <div class="process-card reveal">
-        <div class="process-step">01</div>
-        <h3>Discover</h3>
-        <p>We learn how your organization actually runs before writing a line of code.</p>
-      </div>
-      <div class="process-card reveal reveal-delay-1">
-        <div class="process-step">02</div>
-        <h3>Design</h3>
-        <p>A clear, modern interface designed around your people, not a generic template.</p>
-      </div>
-      <div class="process-card reveal reveal-delay-2">
-        <div class="process-step">03</div>
-        <h3>Build</h3>
-        <p>We build and test the platform end to end, with you involved at every step.</p>
-      </div>
-      <div class="process-card reveal reveal-delay-3">
-        <div class="process-step">04</div>
-        <h3>Support</h3>
-        <p>Launch day is day one — we stay on to support, refine and extend the platform.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="container">
-  <div class="cta-band reveal">
     <h2>Have an organization that needs software built right?</h2>
-    <p>Tell us what you're running today and what's slowing you down — we'll take it from there.</p>
-    <a href="contact.html" class="btn-primary">Start a project</a>
+    <p>Tell us what you're running today and what's slowing you down, and we'll take it from there.</p>
+    <a href="contact.html" class="btn">Start a project</a>
   </div>
 </section>
 
@@ -322,11 +283,11 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a href="index.html" class="brand"><img src="assets/logo-light.png" alt="Everything Shul" /></a>
+        <a href="index.html" class="brand"><img src="assets/logo.png" alt="Everything Shul" /></a>
         <p>We build custom software for nonprofits.</p>
       </div>
       <div class="footer-col">
-        <h4>Our Work</h4>
+        <h4>Our work</h4>
         <ul>
           <li><a href="https://drm.everythingshul.com" target="_blank" rel="noopener">DRM</a></li>
           <li><a href="https://kipashairbp.org" target="_blank" rel="noopener">Kipas Hair BP</a></li>
