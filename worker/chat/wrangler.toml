@@ -4,7 +4,18 @@ compatibility_date = "2025-01-01"
 
 [vars]
 ALLOWED_ORIGINS = "https://everythingshul.com,https://www.everythingshul.com"
-# Model used for answers. Swap for "claude-haiku-5-5" to cut the per-chat cost a lot.
-MODEL = "claude-opus-5-5"
+SITE_URL = "https://everythingshul.com"
+# Where chat requests are sent, and who they reply as. SENDER_EMAIL must be verified in Brevo.
+ADMIN_EMAIL = "everythingshul@gmail.com"
+SENDER_EMAIL = "everythingshul@gmail.com"
+SENDER_NAME = "Everything Shul"
 
-# Secret (never committed): npx wrangler secret put ANTHROPIC_API_KEY
+# Conversation storage. Create it once with:  npx wrangler kv namespace create CHAT
+# then paste the printed id below.
+[[kv_namespaces]]
+binding = "CHAT"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+# Secrets (never committed):
+#   npx wrangler secret put BREVO_API_KEY
+#   npx wrangler secret put ADMIN_TOKEN     (a long random password for the /admin/ page)
