@@ -111,6 +111,114 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') closeLightbox();
   });
 
+  /* ---------- motion: reveals, headline words, progress bar, parallax ---------- */
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  try {
+    const io = 'IntersectionObserver' in window
+      ? new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('in');
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' })
+      : null;
+
+    const watch = (el) => { if (io) io.observe(el); else el.classList.add('in'); };
+
+    // Split a headline into words so each can slide up on its own.
+    const splitWords = (el) => {
+      let i = 0;
+      const walk = (node) => {
+        [...node.childNodes].forEach(child => {
+          if (child.nodeType === 3) {
+            const frag = document.createDocumentFragment();
+            child.textContent.split(/(\s+)/).forEach(part => {
+              if (!part) return;
+              if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(' ')); return; }
+              const w = document.createElement('span');
+              w.className = 'w';
+              const inner = document.createElement('span');
+              inner.className = 'wi';
+              inner.style.setProperty('--i', i++);
+              inner.textContent = part;
+              w.appendChild(inner);
+              frag.appendChild(w);
+            });
+            child.replaceWith(frag);
+          } else if (child.nodeType === 1) {
+            walk(child);
+          }
+        });
+      };
+      walk(el);
+      el.setAttribute('data-split', '');
+      watch(el);
+    };
+
+    document.querySelectorAll('.hero h1, .page-hero h1, .about h2, .work-head h2, .process h2, .cta h2').forEach(splitWords);
+
+    // Group reveals: each child of a parent enters a beat after the previous one.
+    const group = (sel, { type = 'up', base = 0, step = 0.09 } = {}) => {
+      const seen = new Map();
+      document.querySelectorAll(sel).forEach(el => {
+        const k = el.parentElement;
+        const n = seen.get(k) || 0;
+        seen.set(k, n + 1);
+        el.setAttribute('data-reveal', type);
+        el.style.setProperty('--d', (base + Math.min(n, 8) * step).toFixed(2) + 's');
+        watch(el);
+      });
+    };
+
+    group('.hero .lede', { base: 0.45 });
+    group('.hero-actions', { base: 0.6 });
+    group('.index li', { base: 0.7, step: 0.07 });
+    group('.page-hero p', { base: 0.35 });
+    group('.about-points p');
+    group('.work-head p', { base: 0.15 });
+    group('.project-text > *', { step: 0.1 });
+    group('.project-media', { type: 'wipe', base: 0.1 });
+    group('.features li', { base: 0.3, step: 0.08 });
+    group('.steps li', { step: 0.12 });
+    group('.cta p', { base: 0.2 });
+    group('.cta .btn', { base: 0.35 });
+    group('.contact-info > div', { step: 0.1 });
+    group('.contact-form h2');
+    group('.contact-form .field', { base: 0.1, step: 0.07 });
+    group('.contact-form .btn', { base: 0.2 });
+    group('.footer-grid > *', { step: 0.12 });
+    group('.marquee', { base: 0.2 });
+    document.querySelectorAll('.project').forEach(watch);
+
+    // Scroll progress bar + gentle parallax on project media.
+    const bar = document.querySelector('.progress');
+    const frames = [...document.querySelectorAll('.project-media .frame')];
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      if (bar) bar.style.transform = `scaleX(${max > 0 ? Math.min(window.scrollY / max, 1) : 0})`;
+      if (reduceMotion) return;
+      const vh = window.innerHeight;
+      frames.forEach(f => {
+        const r = f.getBoundingClientRect();
+        if (r.bottom < -100 || r.top > vh + 100) return;
+        const offset = (r.top + r.height / 2 - vh / 2) / vh;
+        f.style.transform = `translateY(${(offset * -28).toFixed(1)}px)`;
+      });
+    };
+    window.addEventListener('scroll', () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  } catch (err) {
+    document.documentElement.classList.add('no-motion');
+  }
+
   /* ---------- share buttons ---------- */
   /* Shares the project's /share/<id>/ page, which carries the thumbnail (Open Graph) tags. */
   const SHARE_BASE = 'https://everythingshul.com/share/';

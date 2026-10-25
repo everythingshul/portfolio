@@ -54,6 +54,7 @@ def head(title, desc, extra=''):
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+<script>document.documentElement.classList.add('js')</script>
 {extra}'''
 
 def og(title, desc, image, url):
@@ -71,7 +72,9 @@ def og(title, desc, image, url):
 <meta name="twitter:image" content="{SITE}/assets/share/{image}" />
 '''
 
-NAV = '''<nav class="navbar">
+NAV = '''<div class="progress" aria-hidden="true"></div>
+<div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
+<nav class="navbar">
   <a href="index.html" class="brand"><img src="assets/logo-light.png" alt="Everything Shul" /></a>
   <div class="nav-links">
     <a href="index.html#work">Work</a>
@@ -156,7 +159,7 @@ def project_html(i, p):
 {feats}
           </ul>
           <div class="actions">
-            <a href="{p['url']}" target="_blank" rel="noopener" class="btn">Visit site ↗</a>
+            <a href="{p['url']}" target="_blank" rel="noopener" class="btn">Visit site <span class="arr">↗</span></a>
             <button type="button" class="btn-line share-btn" data-id="{p['id']}" data-title="{e(share_title)}" data-text="{e(p['full'])}, built by Everything Shul: {e(p['kind'].lower())}.">{SHARE_SVG}<span>Share</span></button>
           </div>
         </div>
@@ -166,6 +169,10 @@ def project_html(i, p):
         </figure>
       </div>
     </section>'''
+
+def marquee():
+    half = ''.join(f'<span>{e(p["name"])}</span><i></i>' for p in PROJECTS)
+    return f'<div class="marquee" aria-hidden="true"><div class="marquee-track">{half}{half}</div></div>'
 
 def index_html():
     idx = '\n'.join(
@@ -196,6 +203,7 @@ def index_html():
   </div>
 </header>
 
+{marquee()}
 <section id="about" class="about">
   <div class="container about-grid">
     <h2>Software that fits the way your organization works.</h2>
