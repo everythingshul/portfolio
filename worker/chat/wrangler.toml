@@ -15,7 +15,7 @@ SENDER_NAME = "Everything Shul"
 # then paste the printed id below.
 [[kv_namespaces]]
 binding = "CHAT"
-id = "PASTE_KV_NAMESPACE_ID_HERE"
+id = "149cbf4cdbe64dcb8801de42326321ec"
 
 # Secrets (never committed):
 #   npx wrangler secret put BREVO_API_KEY
