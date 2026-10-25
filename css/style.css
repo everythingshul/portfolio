@@ -1000,4 +1000,24 @@ h1, h2, h3, h4 {
   .play-full { white-space: nowrap; padding: 9px 16px 9px 11px; font-size: 0.8rem; gap: 8px; }
   .play-full .play-icon { width: 26px; height: 26px; }
   .brand img { height: 38px; }
+
+  /* showcase: video and text side by side on phones */
+  .showcase-card, .showcase-card.reverse { grid-template-columns: 1fr 42%; gap: 14px; align-items: start; }
+  .showcase-card.reverse { grid-template-columns: 42% 1fr; }
+  .showcase-card .showcase-copy { order: 1; }
+  .showcase-card .showcase-media { order: 2; }
+  .showcase-card.reverse .showcase-copy { order: 2; }
+  .showcase-card.reverse .showcase-media { order: 1; }
+  .showcase-copy h3 { font-size: 1.1rem; margin-bottom: 8px; }
+  .showcase-copy p { font-size: 0.8rem; line-height: 1.5; margin-bottom: 12px; }
+  .showcase-tag { font-size: 0.6rem; margin-bottom: 8px; }
+  .feature-list { display: none; }
+  .showcase-copy, .showcase-media { min-width: 0; }
+  .showcase-links .btn-small { font-size: 0.66rem; padding: 7px 8px; letter-spacing: -0.01em; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
+  .browser-url, .video-caption { display: none; }
+  .browser-topbar { padding: 8px 10px; }
+  .scroll-window { height: 190px; }
+  .video-stage { aspect-ratio: 3 / 4; }
+  .play-full { font-size: 0; gap: 0; padding: 7px; }
+  .play-full .play-icon { width: 28px; height: 28px; }
 }
