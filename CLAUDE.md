@@ -53,7 +53,8 @@ non-profits") — all were explicitly removed per client request. Don't reintrod
 4. **JListings** (`jlistings.com`) — organization classifieds/editorial. **Placeholder only**
    (see "Known gaps" below).
 5. **Mamudem** (`mamudem.com`) — event/dinner ticketing, QR check-in, attendee management.
-   **Placeholder only**.
+   Has a real video showcase (preview loop cut from the ticket-purchase and promo-code screens,
+   poster is the admin dashboard; the attendee table with personal details is only in the full tour).
 6. **Fundraise Wall** (`fundraise.everythingshul.com`) — live fundraising wall + dashboard.
    **Placeholder only**.
 
