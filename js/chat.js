@@ -140,13 +140,19 @@
 
   const fromEntry = (e, state) => {
     let text = pick(e.r);
-    const m = { text, links: (e.l || []).map(linkFor), chips: e.c || [], action: e.a || null, entry: e.i };
+    const m = { text, links: (e.l || []).map(linkFor), chips: e.c || [], action: e.a || null, entry: e.i, fb: e.f !== 0 && !['handoff', 'reset', 'repeat', 'recall', 'projects'].includes(e.a) };
     if (m.action === 'projects') m.chips = Object.keys(KB.projects).map((id) => KB.projects[id].name);
     if (m.action === 'repeat') {
       const last = [...state.history].reverse().find((x) => x.role === 'bot' && x.entry !== 'repeat');
       m.text = last ? last.text : 'Nothing to repeat yet. Ask me anything about Everything Shul!';
       m.chips = last && last.chips && last.chips.length ? last.chips : MAIN;
       m.links = last && last.links ? last.links : [];
+    }
+    if (m.action === 'recall') {
+      const asked = state.history.filter((x) => x.role === 'user');
+      const prev = asked[asked.length - 2];
+      m.text = prev ? `You asked: \u201c${prev.text}\u201d` : "You haven't asked me anything yet!";
+      m.action = null; m.fb = false; m.chips = MAIN;
     }
     if (m.action === 'offer' && !m.chips.length) m.chips = [TEAM, 'No thanks'];
     return m;
@@ -175,7 +181,7 @@
         text = fill(tpl, id);
       }
     }
-    return { text, links, chips: looksLikeOffer(text) ? [TEAM, 'No thanks'] : projectChips(id), action: looksLikeOffer(text) ? 'offer' : null, project: id, entry: 'pj:' + intent };
+    return { text, links, chips: looksLikeOffer(text) ? [TEAM, 'No thanks'] : projectChips(id), action: looksLikeOffer(text) ? 'offer' : null, project: id, entry: 'pj:' + intent, fb: true };
   };
 
   const FALLBACK = [
@@ -209,7 +215,7 @@
     if (explicit) {
       if (pj && ps >= 3 && (gs <= ps + 4 || (ps >= 6 && !(g && (g.e.p || 0) >= 3)))) return fromProject(pj.e.j, explicit);
       if (g && gs >= 3 && (gs > ps + 4 || ps < 3) && (g.e.p || 0) >= 2) return fromEntry(g.e, state);
-      if (g && gs >= 9 && ps < 3) return fromEntry(g.e, state);
+      if (g && gs >= 9 && ps <= 3) return fromEntry(g.e, state);
       return fromProject('overview', explicit);
     }
     // Follow-up about the project we were just discussing ("how much does it cost?")
@@ -220,10 +226,201 @@
     return null;
   };
 
-  if (window.ES_CHAT_DEBUG) window.__chat = { respond, norm };
+
+  /* ====================================================================== little tools */
+  // Things Chesky can actually do, instead of deflecting: math, dates, dice, a few words of Hebrew/Yiddish.
+  const rand = (n) => Math.floor(Math.random() * n);
+  const fmtNum = (n) => { if (!isFinite(n)) return null; const r = Math.round(n * 1e10) / 1e10; return Math.abs(r) >= 1e15 ? r.toExponential(4) : String(r); };
+
+  // Tiny recursive-descent calculator: + - * / % ^ and parentheses (no eval).
+  const calc = (src) => {
+    const s = src.replace(/\s+/g, '');
+    let i = 0;
+    const num = () => { const m = /^\d*\.?\d+/.exec(s.slice(i)); if (!m) throw new Error('num'); i += m[0].length; return parseFloat(m[0]); };
+    const atom = () => {
+      if (s[i] === '(') { i++; const v = expr(); if (s[i] !== ')') throw new Error('paren'); i++; return v; }
+      if (s[i] === '-') { i++; return -atom(); }
+      if (s[i] === '+') { i++; return atom(); }
+      return num();
+    };
+    const pow = () => { const b = atom(); if (s[i] === '^') { i++; return Math.pow(b, pow()); } return b; };
+    const term = () => { let v = pow(); while (s[i] === '*' || s[i] === '/' || s[i] === '%') { const op = s[i++]; const r = pow(); v = op === '*' ? v * r : op === '/' ? v / r : v % r; } return v; };
+    const expr = () => { let v = term(); while (s[i] === '+' || s[i] === '-') { const op = s[i++]; const r = term(); v = op === '+' ? v + r : v - r; } return v; };
+    const v = expr();
+    if (i !== s.length) throw new Error('trailing');
+    return v;
+  };
+
+  const mathReply = (raw) => {
+    let q = String(raw).toLowerCase().replace(/×/g, '*').replace(/÷/g, '/').replace(/,(?=\d{3}\b)/g, '');
+    const pct = /(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)/.exec(q);
+    if (pct) return `${pct[1]}% of ${pct[2]} is ${fmtNum(parseFloat(pct[1]) * parseFloat(pct[2]) / 100)}.`;
+    const sq = /square root of (\d+(?:\.\d+)?)/.exec(q);
+    if (sq) return `The square root of ${sq[1]} is ${fmtNum(Math.sqrt(parseFloat(sq[1])))}.`;
+    q = q.replace(/what(?:'s| is)|how much is|calculate|compute|solve|equals|what/g, ' ')
+      .replace(/to the power of/g, '^').replace(/\bplus\b/g, '+').replace(/\bminus\b/g, '-')
+      .replace(/\b(?:times|multiplied by)\b/g, '*').replace(/\b(?:divided by|over)\b/g, '/')
+      .replace(/(\d)\s*x\s*(\d)/g, '$1*$2').replace(/[=?!]/g, ' ').trim();
+    if (!/^[\d\s.+\-*/()^%]+$/.test(q) || !/\d/.test(q) || !/[+\-*/^%]/.test(q.replace(/^\s*[-+]/, ''))) return null;
+    if (/^\d+\s*\/\s*\d+$/.test(q) && q.replace(/\s/g, '') === '24/7') return null;
+    if (q.replace(/\D/g, '').length >= 14 || (/\d-\d/.test(q) && q.replace(/\D/g, '').length >= 8 && !/\s/.test(q))) return null;
+    try {
+      const v = calc(q);
+      if (!isFinite(v)) return "That one doesn't work out, since you can't divide by zero.";
+      const shown = q.replace(/\s+/g, '').replace(/([+\-*/^%])/g, ' $1 ').replace(/\s+/g, ' ').trim();
+      return `${shown} = ${fmtNum(v)}`;
+    } catch (e) { return null; }
+  };
+
+  const hebrewDate = () => {
+    try { return new Intl.DateTimeFormat('en-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()); } catch (e) { return null; }
+  };
+
+  const WORDS = {
+    hello: ['shalom', 'sholem aleichem'], hi: ['shalom', 'sholem aleichem'], peace: ['shalom', 'sholem'],
+    'thank you': ['toda', 'a dank'], thanks: ['toda', 'a dank'], 'thank you very much': ['toda raba', 'a sheynem dank'],
+    'good morning': ['boker tov', 'a gutn morgn'], 'good night': ['laila tov', 'a gute nakht'], 'good evening': ['erev tov', 'a gutn ovnt'],
+    please: ['bevakasha', 'zeyt azoy gut'], yes: ['ken', 'yo'], no: ['lo', 'neyn'], 'good luck': ['b\'hatzlacha', 'mazl un brokhe'],
+    congratulations: ['mazal tov', 'mazl tov'], 'mazel tov': ['mazal tov', 'mazl tov'], 'mazal tov': ['mazal tov', 'mazl tov'], welcome: ['baruch haba', 'vilkum'],
+    friend: ['chaver', 'fraynd'], love: ['ahava', 'libe'], water: ['mayim', 'vaser'], 'good week': ['shavua tov', 'a gute vokh'],
+    'good shabbos': ['shabbat shalom', 'gut shabbos'], 'happy birthday': ['yom huledet sameach', 'a gutn geburtstog'], goodbye: ['lehitraot', 'zay gezunt'], sorry: ['slicha', 'zayt moykhl'],
+  };
+  const ALIAS_WORDS = { goodnight: 'good night', 'good morning to you': 'good morning', thx: 'thanks', 'thank u': 'thank you', 'mazel tov': 'congratulations', 'bye': 'goodbye', 'excuse me': 'sorry' };
+  const translate = (phrase, lang) => {
+    let w = phrase.toLowerCase().replace(/["'.!?]|the word|the phrase/g, '').replace(/\s+/g, ' ').trim();
+    w = ALIAS_WORDS[w] || w;
+    const hit = WORDS[w];
+    if (!hit) return `I don't know that one yet. I only know a handful of words, like hello, thank you, good morning, please, yes, no, good luck, congratulations and welcome.`;
+    const he = `Hebrew: "${hit[0]}"`; const yi = `Yiddish: "${hit[1]}"`;
+    const out = lang === 'hebrew' ? he : lang === 'yiddish' ? yi : `${he}. ${yi}`;
+    return `${w.charAt(0).toUpperCase() + w.slice(1)}. ${out}. (Spelling in English letters varies.)`;
+  };
+
+  const RPS = ['rock', 'paper', 'scissors'];
+  const RPS_WIN = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+
+  const utility = (raw, t, tokens) => {
+    const has = (re) => re.test(t);
+    const R = (text, chips) => ({ text, chips: chips || ['What do you build?', 'Tell me a joke', 'Fun fact', TEAM], links: [], entry: 'util', fb: false });
+
+    const math = mathReply(raw);
+    if (math) return R(math, ['Flip a coin', 'What do you build?', TEAM]);
+
+    // Hebrew date (today's), but not questions about whether software supports it.
+    if (has(/(what'?s|what is|tell me|give me)( the)?( today'?s)? (hebrew|jewish) (date|day)|today'?s (hebrew|jewish) date|(hebrew|jewish) date (today|now)|date in hebrew|which (hebrew|jewish) month|what (hebrew|jewish) month|what is the hebrew date/) && !has(/drm|software|platform|support|your|do you|can you|does /)) {
+      const d = hebrewDate();
+      if (d) return R(`By your device's date, it's ${d} on the Hebrew calendar. The Hebrew day actually begins at nightfall, so after dark it may already be the next date.`);
+    }
+    if (has(/what time is it|what'?s the time|what is the time|current time|the time now|tell me the time|do you have the time/)) {
+      return R(`It's ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} by your device's clock.`);
+    }
+    if (has(/today'?s date|what'?s the date|what is the date|what day is it|what day is today|what is today|what'?s today|current date|day of the week|what year is it|what month is it|what is the day today/)) {
+      return R(`Today is ${new Date().toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`);
+    }
+
+    if (has(/flip (a )?coin|toss (a )?coin|coin flip|heads or tails|flip a coin/)) return R(`${pick(['Heads!', 'Tails!'])} Want another flip?`, ['Flip a coin', 'Roll a dice', 'What do you build?']);
+    const die = /roll a d(\d+)/.exec(t);
+    if (die || has(/roll (a |the )?(die|dice)|throw (a |the )?dice|dice roll|roll dice/)) {
+      const sides = Math.min(1000, Math.max(2, die ? parseInt(die[1], 10) : 6));
+      return R(`You rolled a ${1 + rand(sides)} (on a ${sides}-sided die).`, ['Roll a dice', 'Flip a coin', 'What do you build?']);
+    }
+    const rn = /(?:random number|pick a number|number)(?: between (\d+) and (\d+))?/.exec(t);
+    if (rn && has(/random number|pick a number|number between \d+ and \d+/)) {
+      let lo = rn[1] ? parseInt(rn[1], 10) : 1; let hi = rn[2] ? parseInt(rn[2], 10) : 100;
+      if (lo > hi) [lo, hi] = [hi, lo];
+      return R(`How about ${lo + rand(hi - lo + 1)}?`, ['Another number', 'Flip a coin', 'What do you build?']);
+    }
+    const rps = /^(?:i (?:choose|pick|play|go with|throw|say) )?(rock|paper|scissors)\b/.exec(t.trim());
+    if (rps && tokens.length <= 5) {
+      const me = RPS[rand(3)]; const you = rps[1];
+      const res = me === you ? "It's a tie!" : RPS_WIN[you] === me ? 'You win!' : 'I win!';
+      return R(`You chose ${you}, I chose ${me}. ${res}`, ['Rock', 'Paper', 'Scissors', 'What do you build?']);
+    }
+    const ch = /^(?:please |can you |could you )?(?:pick|choose|decide)(?: for me)?(?: between| one| from)?:?\s+(.+?)\??$/.exec(String(raw).toLowerCase().trim());
+    if (ch) {
+      const opts = ch[1].split(/\s+or\s+|,\s*|\s*\/\s*/).map((x) => x.replace(/^(?:one|between|from)\s+/, '').trim()).filter(Boolean);
+      if (opts.length >= 2 && opts.length <= 6 && opts.every((o) => o.length <= 40)) return R(`I pick: ${pick(opts)}.`, ['Pick again', 'Flip a coin', 'What do you build?']);
+    }
+    if (/^pick again$/.test(t.trim())) return null;
+
+    const tr = /(?:how (?:do|can|would) (?:you|i) say|what(?:'s| is)(?: the)?|translate|say)\s+(.+?)\s+(?:in|into|to)\s+(hebrew|yiddish)|^(.+?)\s+in\s+(hebrew|yiddish)\s*$/.exec(String(raw).toLowerCase().replace(/[?]+$/, '').trim());
+    if (tr) return R(translate(tr[1] || tr[3], tr[2] || tr[4]), ['Thank you in Yiddish', 'Mazal tov in Hebrew', 'What do you build?']);
+    return null;
+  };
+
+  const RANDOM_MISS = [
+    "Good question, but it's outside my wheelhouse. I'm best with questions about Everything Shul, and I can't look things up. Want a joke or a fun fact instead?",
+    "I wish I knew! That's beyond what I can answer here. I can tell you about our work, or pass anything to the team.",
+    "That one's above my pay grade. I stick to Everything Shul questions, plus a few jokes and games on the side.",
+    "Hmm, I don't have an answer for that, and I'd rather not guess. Ask me about our work, or try a joke or a game!",
+  ];
+  const ON_TOPIC = /\b(you|your|yours|we|our|us|shul|shuls|organi[sz]ations?|donors?|donations?|tickets?|platforms?|sites?|software|projects?|price|cost|team|help|build|built|custom|nonprofits?|charit(?:y|ies)|members?|events?|dinners?|fundrais\w*|apps?|systems?|database|website|email|contact|quote|support|developers?)\b/;
+  const isRandomQuestion = (text) => { const t = norm(text); return t.trim().split(' ').length >= 3 && !ON_TOPIC.test(t); };
+
+  /* ====================================================================== what the team has taught him */
+  // Answers the team approved (from the admin page). Matched by how much of a question's meaning overlaps.
+  const STOP = new Set(['a', 'an', 'the', 'is', 'are', 'am', 'was', 'were', 'be', 'do', 'does', 'did', 'you', 'your', 'yours', 'i', 'we', 'our', 'us', 'me', 'my', 'can', 'could', 'would', 'should', 'will', 'to', 'of', 'in', 'on', 'at', 'for', 'with', 'it', 'its', 'and', 'or', 'this', 'that', 'there', 'have', 'has', 'had', 'what', 'how', 'about', 'please', 'any', 'so', 'if', 'as', 'by', 'from', 'just', 'also', 'tell', 'know', 'want', 'need', 'get', 'got', 'like']);
+  const contentTokens = (text) => norm(text).trim().split(' ').filter((w) => w && !STOP.has(w)).map(stem);
+  let learned = [];
+  const setLearned = (list) => {
+    learned = (list || []).map((e) => ({ id: e.id, r: e.r, qs: (e.qs || []).map(contentTokens).filter((a) => a.length) }));
+  };
+  const sameWord = (a, b) => a === b || (a.length >= 5 && b.length >= 5 && lev(a, b, 1) <= 1);
+  const learnedMatch = (t) => {
+    if (!learned.length) return null;
+    const B = contentTokens(t);
+    if (!B.length) return null;
+    let best = null;
+    learned.forEach((e) => e.qs.forEach((A) => {
+      const inter = A.filter((a) => B.some((b) => sameWord(a, b))).length;
+      if (!inter) return;
+      const sim = inter / (A.length + B.length - inter);
+      const need = Math.min(2, A.length);
+      if (inter >= need && sim >= 0.6 && (!best || sim > best.sim)) best = { e, sim };
+    }));
+    return best;
+  };
+  const LKEY = 'es-chat-learned';
+  const loadLearned = async () => {
+    if (!ENDPOINT) return;
+    try {
+      const cached = JSON.parse(ssGet(LKEY) || 'null');
+      if (cached && Date.now() - cached.at < 10 * 60 * 1000) { setLearned(cached.entries); return; }
+    } catch (e) { /* ignore */ }
+    try {
+      const res = await fetch(`${ENDPOINT}/learned`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setLearned(data.entries);
+      ssSet(LKEY, JSON.stringify({ at: Date.now(), entries: data.entries }));
+    } catch (e) { /* offline: the built-in answers still work */ }
+  };
+
+  // Anonymous signals so the team can see what he can't answer: never names or emails.
+  const logEvent = (type, q, entry) => {
+    if (!ENDPOINT || !q) return;
+    try {
+      fetch(`${ENDPOINT}/log`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, q: String(q).slice(0, 200), entry: entry || '' }), keepalive: true }).catch(() => {});
+    } catch (e) { /* ignore */ }
+  };
+
+  const respondAll = (raw, state) => {
+    const t = norm(raw);
+    const tokens = t.trim().split(' ').filter(Boolean);
+    if (!(state.pending === 'offer' && YES.test(t))) {
+      const u = utility(raw, t, tokens);
+      if (u) { state.pending = null; return u; }
+      const L = learnedMatch(t);
+      if (L) { state.pending = null; return { text: L.e.r, links: [], chips: ['What do you build?', TEAM], entry: 'L:' + L.e.id, fb: true }; }
+    }
+    return respond(raw, state);
+  };
+
+  if (window.ES_CHAT_DEBUG) window.__chat = { respond: respondAll, norm, setLearned };
+
 
   /* ====================================================================== state */
-  const state = { history: [], pending: null, project: null, turnsSinceProject: 99, misses: 0 };
+  const state = { history: [], pending: null, project: null, turnsSinceProject: 99, misses: 0, randoms: 0 };
   let human = null; // { id, known }
   const ssGet = (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
   const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) { /* ignore */ } };
@@ -255,7 +452,7 @@
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', 'Chat with Chesky');
   panel.innerHTML =
-    `<header class="chat-head"><img src="${AVATAR}" alt="" width="38" height="38"><div><strong>Chesky</strong><span><i></i><em>Everything Shul's assistant</em></span></div>` +
+    `<header class="chat-head"><img src="${AVATAR}" alt="" width="38" height="38"><div><strong>Chesky</strong><span><i></i><em>Online</em></span></div>` +
     '<button type="button" class="chat-x" aria-label="Close chat">×</button></header>' +
     '<div class="chat-log" aria-live="polite"></div>' +
     '<div class="chat-chips"></div>' +
@@ -312,9 +509,27 @@
     }
     body.appendChild(bubble);
     addLinks(body, m.links);
+    if (role === 'bot' && m.fb && animate) {
+      log.querySelectorAll('.chat-fb').forEach((x) => x.remove());
+      const fb = el('div', 'chat-fb',
+        '<button type="button" data-k="up" aria-label="This helped"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11v9H4v-9h3zM7 11l4-8c1.5 0 2.5 1 2.5 2.5V9H19a2 2 0 0 1 2 2.3l-1 6A2 2 0 0 1 18 19H7"/></svg></button>' +
+        '<button type="button" data-k="down" aria-label="This did not help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 13V4h3v9h-3zM17 13l-4 8c-1.5 0-2.5-1-2.5-2.5V15H5a2 2 0 0 1-2-2.3l1-6A2 2 0 0 1 6 5h11"/></svg></button>');
+      fb.querySelectorAll('button').forEach((btn) => btn.addEventListener('click', () => onFeedback(m, btn.dataset.k, fb)));
+      body.appendChild(fb);
+    }
     log.appendChild(row);
     scroll();
     return row;
+  };
+
+  // Thumbs: tell the team how an answer landed so they can fix or teach it.
+  const onFeedback = (m, kind, fb) => {
+    logEvent(kind, m.q || '', m.entry || '');
+    fb.innerHTML = `<span class="chat-fb-done">${kind === 'up' ? 'Glad that helped!' : 'Thanks, I noted that.'}</span>`;
+    if (kind === 'down') {
+      const msg = { role: 'bot', text: "Sorry about that. Want me to pass your question to the team? They can answer it properly, and it helps them teach me for next time.", chips: [TEAM, 'No thanks'], links: [] };
+      state.history.push(msg); addMessage(msg); setChips(msg.chips); state.pending = 'offer'; save();
+    }
   };
 
   const setChips = (chips) => {
@@ -425,7 +640,7 @@
   const setHumanUI = (on) => {
     panel.classList.toggle('human', on);
     headName.textContent = on ? 'Everything Shul team' : 'Chesky';
-    headSub.textContent = on ? 'Replies here and by email' : "Everything Shul's assistant";
+    headSub.textContent = on ? 'Replies here and by email' : 'Online';
     headImg.src = on ? TEAM_AVATAR : AVATAR;
     input.placeholder = on ? 'Message the team…' : 'Type your question…';
   };
@@ -515,19 +730,28 @@
     if (human) { await sendToTeam(text); return; }
     busy = true;
     setChips([]);
+    log.querySelectorAll('.chat-fb').forEach((x) => x.remove());
     const q = { role: 'user', text };
     state.history.push(q);
     addMessage(q);
     const t = typing();
     const started = Date.now();
 
-    let reply = respond(text, state);
+    let reply = respondAll(text, state);
     if (reply) {
-      state.misses = 0;
+      state.misses = 0; state.randoms = 0;
       if (reply.project) { state.project = reply.project; state.turnsSinceProject = 0; } else { state.turnsSinceProject++; }
+    } else if (isRandomQuestion(text)) {
+      // A random question that has nothing to do with us: friendly, and not a "failure".
+      state.turnsSinceProject++;
+      state.randoms++;
+      reply = state.randoms >= 3
+        ? { text: "I'm clearly not hitting the mark today. Want me to bring in a real person from the team?", chips: [TEAM, 'No thanks'], links: [], action: 'offer' }
+        : { text: pick(RANDOM_MISS), chips: ['Tell me a joke', 'Fun fact', 'What do you build?', TEAM], links: [], action: null };
     } else {
       state.misses++;
       state.turnsSinceProject++;
+      if (text.split(/\s+/).length >= 2 || text.length >= 5) logEvent('miss', text, '');
       if (state.misses >= 2) {
         reply = { text: "I'm still not getting it, and I don't want to waste your time. Let me pass this to a real person.", action: 'handoff', chips: [], links: [] };
       } else {
@@ -540,7 +764,7 @@
     if (reply.action === 'reset') {
       state.history = []; log.innerHTML = ''; state.project = null; state.pending = null; state.misses = 0;
     }
-    const m = { role: 'bot', text: reply.text, links: reply.links || [], chips: reply.chips || [], entry: reply.entry };
+    const m = { role: 'bot', text: reply.text, links: reply.links || [], chips: reply.chips || [], entry: reply.entry, q: text, fb: !!reply.fb };
     state.history.push(m);
     addMessage(m);
     state.pending = reply.action === 'offer' ? 'offer' : null;
@@ -610,6 +834,8 @@
     state.history.forEach((x) => addMessage(x, false));
     if (state.history.length) setChips(state.history[state.history.length - 1].chips || []);
   }
+
+  loadLearned();
 
   const nudged = ssGet(STORE + '-nudged');
   if (!nudged && !m) setTimeout(() => { if (!isOpen) nudge.classList.add('show'); }, 7000);

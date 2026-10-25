@@ -12,6 +12,19 @@ The team answers from `https://everythingshul.com/admin/` (password protected).
 Replying to the notification email goes to the visitor's inbox only. To keep the conversation in the
 chat, reply in the admin page.
 
+## Teaching Chesky
+
+Chesky also learns, but only what the team approves:
+
+- Visitors can give a thumbs up or down on his answers. Questions he couldn't answer and thumbs-downs are
+  logged anonymously (emails and phone numbers are scrubbed; names are never sent).
+- In `/admin/` open **Teach Chesky**: write an answer once (plus other ways people ask it) and he uses it for
+  similar questions from then on. You can edit or forget anything he has learned.
+- When you reply to a chat, tick **Also teach Chesky this answer** to save your reply (edited, without names)
+  for next time.
+- Taught answers take priority over his built-in ones, so you can also fix an answer people don't like.
+- Only replies sent from the admin page are seen by the system. Replying from Gmail directly won't teach him.
+
 ## One-time setup (about 10 minutes)
 
 1. Make sure the Brevo sender address is verified (same one the contact form uses).
@@ -42,4 +55,5 @@ Until step 5 is done the chat still works: "Connect me with the team" opens the 
 - Per-IP limits (6 handoffs / 60 messages per hour), message length caps, and a 30-second throttle on
   team notification emails during a fast back-and-forth.
 - Conversations are deleted after 180 days; you can also delete one from the admin page.
+- The anonymous question log keeps at most 300 questions; taught answers at most 400.
 - The conversation id is the visitor's key to their own chat, so it is long and random.

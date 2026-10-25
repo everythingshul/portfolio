@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="../css/style.css" />
 <style>
   body { overflow-x: hidden; }
+  [hidden] { display: none !important; }
   .adm { max-width: 1200px; margin: 0 auto; padding: 24px var(--gutter) 60px; }
   .adm-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
   .adm-top h1 { font-size: 1.8rem; }
@@ -49,6 +50,28 @@
   .reply .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.82rem; color: var(--ink-3); }
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; z-index: 50; }
   .back { display: none; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--rule); }
+  .tab { padding: 10px 16px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-3); font: inherit; cursor: pointer; }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--ink); border-bottom-color: var(--cyan); }
+  .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 10px; background: #ff5d5d; color: #fff; font-size: 0.72rem; line-height: 20px; text-align: center; }
+  .count:empty { display: none; }
+  #teach h2 { font-size: 1.4rem; margin: 28px 0 12px; }
+  #teach .lead { max-width: 52em; color: var(--ink-2); font-size: 0.97rem; }
+  .card { border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); padding: 16px 18px; margin-bottom: 12px; }
+  .card .q { color: var(--ink); font-size: 1.05rem; margin-bottom: 4px; overflow-wrap: anywhere; }
+  .card .meta { color: var(--ink-3); font-size: 0.8rem; margin-bottom: 12px; }
+  .card textarea { width: 100%; padding: 9px 11px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 0.93rem; resize: vertical; }
+  .card textarea:focus, .reply input:focus { outline: none; border-color: var(--cyan); }
+  .card .row { display: flex; gap: 8px; }
+  .card .ans { color: var(--ink-2); white-space: pre-wrap; margin: 6px 0 10px; font-size: 0.93rem; }
+  .card .vars { color: var(--ink-3); font-size: 0.82rem; margin-top: 4px; }
+  .card code { background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; }
+  .teach-box { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .teach-box label, .reply .check { font-size: 0.85rem; color: var(--ink-2); }
+  .reply .check { display: flex; gap: 8px; align-items: center; }
+  .reply input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; font-size: 0.9rem; }
+  .teach-box textarea { min-height: 60px; }
   @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; }
     .layout.open .list { display: none; }
@@ -75,9 +98,20 @@
       <h1>Chat inbox</h1>
       <div class="meta"><span id="status">Loading…</span><button class="small-btn" id="logout">Sign out</button></div>
     </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="chats">Chats <span class="count" id="tab-chats"></span></button>
+      <button class="tab" data-tab="teach">Teach Chesky <span class="count" id="tab-teach"></span></button>
+    </div>
     <div class="layout" id="layout">
       <div class="list" id="list"></div>
       <div class="conv" id="conv"><div class="empty">Pick a conversation to read it.</div></div>
+    </div>
+    <div id="teach" hidden>
+      <p class="lead">Chesky only learns what you teach him. Below are questions he couldn't answer and answers visitors gave a thumbs-down. Write the answer once and he'll use it for similar questions from then on. Nothing a visitor types ever becomes an answer without you.</p>
+      <h2>To teach <span class="count" id="n-unans"></span></h2>
+      <div id="unans"></div>
+      <h2>What he has learned <span class="count" id="n-learned"></span></h2>
+      <div id="learned"></div>
     </div>
   </section>
 </main>

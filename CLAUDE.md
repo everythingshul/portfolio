@@ -134,15 +134,24 @@ and footer.
 4. **Logo:** `assets/logo.png` is the sharp logo taken from kipashairbp.org's footer.
 
 5. **Chat bot ("Chesky"):** a friendly illustrated Hasidic man (assets/chesky.svg: black kippah, beard,
-   long curled peyos, white button-down; keep the depiction respectful, never caricatured). He is NOT a
-   live AI. The client explicitly chose stored replies: tools/kb.py holds ~300 keyword-matched replies;
-   js/chat.js matches the visitor's words (typo tolerant) and answers. He introduces himself as a virtual
-   assistant. Honesty rule for new replies: only state facts that are on the site; for price, timing,
-   security, integrations and anything unknown say the team will answer and offer the handoff.
-   When he is stuck (or asked for a person), the visitor leaves an email; the team replies from /admin/;
+   long curled peyos, white button-down; keep the depiction respectful, never caricatured). The header
+   says just "Chesky" with an "Online" status (client asked not to call him "Everything Shul's
+   assistant"). He is NOT a live AI: the client explicitly chose stored replies. tools/kb.py holds ~360
+   keyword-matched replies (including lots of random/personality questions); js/chat.js matches the
+   visitor's words (typo tolerant, light stemming) and also has little tools: math, today's date/time, the
+   Hebrew date, coin/dice/random number, rock-paper-scissors, "pick A or B", and a few Hebrew/Yiddish words.
+   Honesty rule for new replies: only state facts that are on the site; for price, timing, security,
+   integrations and anything unknown say the team will answer and offer the handoff.
+   **Learning (team-approved only):** answers get thumbs up/down; questions he can't answer and thumbs-downs
+   are logged anonymously (emails/phones scrubbed) to the Worker. In /admin/ -> "Teach Chesky" the team
+   writes an answer once, or ticks "Also teach Chesky" when replying to a chat, and he uses it for similar
+   questions from then on (taught answers beat built-in ones; they can be edited or forgotten). Visitors can
+   never add answers themselves. Replies sent from Gmail directly are not seen by the system; only replies
+   sent from the admin page teach him.
+   **Handoff:** when stuck (or asked for a person) the visitor leaves an email; the team replies from /admin/;
    the visitor sees it in the chat and gets it by email (worker/chat, see its README). Until the client
    deploys that Worker (KV + Brevo key + ADMIN_TOKEN) and sets js/chat-config.js, the handoff falls back to
-   opening the visitor's email app.
+   opening the visitor's email app and nothing is logged or learned.
 6. **Favicon:** the logo on a dark square; icon links carry `?v=3` to bust browser caches. Bump the
    number in tools/build.py if the icon changes again.
 

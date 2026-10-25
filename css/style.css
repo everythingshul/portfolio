@@ -666,3 +666,11 @@ html.no-motion .project::before { transform: none !important; }
 .chat-cancel:hover { color: var(--ink); border-color: var(--ink-3); }
 .chat-msg.team { align-self: flex-start; flex-direction: row; align-items: flex-start; gap: 8px; }
 .chat-msg.team .chat-av { background: #0c0d11; padding: 2px; }
+
+/* ---- chat: feedback thumbs ---- */
+.chat-fb { display: flex; gap: 4px; margin: -2px 0 0 2px; align-items: center; }
+.chat-fb button { width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px; background: transparent; color: var(--ink-3); display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s, transform 0.2s; }
+.chat-fb button:hover { color: var(--cyan-ink); background: rgba(37, 169, 234, 0.12); transform: translateY(-1px); }
+.chat-fb button[data-k='down']:hover { color: #ff8a80; background: rgba(255, 138, 128, 0.12); }
+.chat-fb svg { width: 15px; height: 15px; }
+.chat-fb-done { font-size: 0.76rem; color: var(--ink-3); padding: 4px 2px; }

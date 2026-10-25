@@ -4,8 +4,11 @@
 //     POST /handoff   start a conversation (email + question), emails the team and the visitor
 //     POST /send      add a visitor message to an open conversation
 //     GET  /poll      fetch messages the visitor hasn't seen yet
+//     GET  /learned  answers the team has taught Chesky (public, read-only)
+//     POST /log      anonymous "I couldn't answer this" / thumbs up / thumbs down events
 //   Admin side (Bearer ADMIN_TOKEN; used by /admin/ on the site):
 //     GET  /admin/list, GET /admin/conv, POST /admin/reply, POST /admin/status, POST /admin/delete
+//     GET  /admin/learn, POST /admin/teach, POST /admin/forget, POST /admin/dismiss   (teaching Chesky)
 //
 // Conversations live in the CHAT KV namespace. Email goes out through Brevo.
 import { adminNotification, customerConfirmation, customerReply } from './emails.js';
@@ -98,6 +101,90 @@ async function limited(env, request, bucket, max) {
   return false;
 }
 
+/* ------------------------------------------------------------------ learning */
+// Chesky learns only what the team teaches him. Visitors can't add answers: they can only
+// report (anonymously) what he couldn't answer or got wrong; the team reviews and teaches.
+const MAX_LEARNED = 400;
+const MAX_UNANSWERED = 300;
+const ENTRY_RE = /^[\w:.\-]{1,40}$/;
+
+const normQ = (q) => String(q).toLowerCase().replace(/[^a-z0-9'\s]/g, ' ').replace(/\s+/g, ' ').trim();
+// Questions are saved without names, emails or phone numbers.
+const scrub = (q) => oneLine(q, 200)
+  .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]')
+  .replace(/\+?\d[\d\s().-]{6,}\d/g, '[number]');
+
+const getLearned = async (env) => (await env.CHAT.get('learned', 'json')) || [];
+const getUnans = async (env) => (await env.CHAT.get('unans', 'json')) || {};
+const getStats = async (env) => (await env.CHAT.get('stats', 'json')) || {};
+
+async function logEvent(request, env, h) {
+  if (await limited(env, request, 'log', 120)) return json({ ok: true }, 200, h);
+  let b;
+  try { b = await request.json(); } catch { return json({ ok: true }, 200, h); }
+  const type = ['miss', 'down', 'up'].includes(b.type) ? b.type : null;
+  const q = scrub(b.q);
+  const entry = ENTRY_RE.test(String(b.entry || '')) ? String(b.entry) : '';
+  if (!type || !q) return json({ ok: true }, 200, h);
+
+  if (entry && (type === 'up' || type === 'down')) {
+    const stats = await getStats(env);
+    const st = stats[entry] || { up: 0, down: 0 };
+    st[type] += 1;
+    st.last = Date.now();
+    stats[entry] = st;
+    const keys = Object.keys(stats);
+    if (keys.length > 600) delete stats[keys.sort((a, c) => (stats[a].last || 0) - (stats[c].last || 0))[0]];
+    await env.CHAT.put('stats', JSON.stringify(stats));
+  }
+  if (type === 'miss' || type === 'down') {
+    const key = normQ(q);
+    if (!key) return json({ ok: true }, 200, h);
+    const un = await getUnans(env);
+    const row = un[key] || { q, miss: 0, down: 0, entries: [], first: Date.now() };
+    row[type] += 1;
+    row.last = Date.now();
+    if (entry && !row.entries.includes(entry) && row.entries.length < 3) row.entries.push(entry);
+    un[key] = row;
+    const keys = Object.keys(un);
+    if (keys.length > MAX_UNANSWERED) {
+      keys.sort((a, c) => (un[a].miss + un[a].down) - (un[c].miss + un[c].down) || (un[a].last || 0) - (un[c].last || 0));
+      delete un[keys[0]];
+    }
+    await env.CHAT.put('unans', JSON.stringify(un));
+  }
+  return json({ ok: true }, 200, h);
+}
+
+async function learnedPublic(env, h) {
+  const list = await getLearned(env);
+  return json({ entries: list.map((e) => ({ id: e.id, qs: e.qs, r: e.r })) }, 200, h);
+}
+
+// Create or update a taught answer. `drop` removes the matching questions from the to-teach list.
+async function teach(env, { id, qs, r, drop }) {
+  const questions = (Array.isArray(qs) ? qs : [qs]).map((x) => clean(x, 200)).filter(Boolean).slice(0, 12);
+  const reply = clean(r, 1500);
+  if (!questions.length || !reply) return { error: 'A question and an answer are both needed.' };
+  const list = await getLearned(env);
+  let entry = id && list.find((e) => e.id === id);
+  if (entry) { entry.qs = questions; entry.r = reply; entry.updated = Date.now(); }
+  else {
+    if (list.length >= MAX_LEARNED) return { error: 'Chesky\'s memory is full. Forget some answers first.' };
+    entry = { id: 'L' + newId().slice(0, 8).replace(/[^A-Za-z0-9]/g, 'x'), qs: questions, r: reply, created: Date.now(), updated: Date.now() };
+    list.unshift(entry);
+  }
+  await env.CHAT.put('learned', JSON.stringify(list));
+  const toDrop = [...(Array.isArray(drop) ? drop : []), ...questions].map(normQ);
+  if (toDrop.length) {
+    const un = await getUnans(env);
+    let changed = false;
+    toDrop.forEach((k) => { if (un[k]) { delete un[k]; changed = true; } });
+    if (changed) await env.CHAT.put('unans', JSON.stringify(un));
+  }
+  return { entry };
+}
+
 /* ------------------------------------------------------------------ handlers */
 async function handoff(request, env, h) {
   if (await limited(env, request, 'handoff', 6)) return json({ error: 'Too many requests. Please email us directly.' }, 429, h);
@@ -179,8 +266,32 @@ async function admin(request, url, env, h) {
     return json(conv, 200, h);
   }
 
+  if (path === '/admin/learn' && request.method === 'GET') {
+    const un = await getUnans(env);
+    const unanswered = Object.keys(un).map((k) => ({ key: k, ...un[k] }))
+      .sort((a, c) => (c.miss + c.down) - (a.miss + a.down) || (c.last || 0) - (a.last || 0));
+    return json({ unanswered, learned: await getLearned(env), stats: await getStats(env) }, 200, h);
+  }
+
   let b = {};
   try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
+
+  if (path === '/admin/teach') {
+    const r = await teach(env, b);
+    return r.error ? json({ error: r.error }, 400, h) : json({ ok: true, entry: r.entry }, 200, h);
+  }
+  if (path === '/admin/forget') {
+    const list = await getLearned(env);
+    await env.CHAT.put('learned', JSON.stringify(list.filter((e) => e.id !== b.id)));
+    return json({ ok: true }, 200, h);
+  }
+  if (path === '/admin/dismiss') {
+    const un = await getUnans(env);
+    delete un[normQ(b.key || '')];
+    await env.CHAT.put('unans', JSON.stringify(un));
+    return json({ ok: true }, 200, h);
+  }
+
   const conv = await getConv(env, b.id);
   if (!conv) return json({ error: 'Not found' }, 404, h);
 
@@ -200,7 +311,14 @@ async function admin(request, url, env, h) {
         htmlContent: customerReply(conv, text, chatLink(env, conv.id), env.SITE_URL),
       });
     } catch (e) { console.error('customer mail', e.message); emailed = false; }
-    return json({ ok: true, emailed, conv }, 200, h);
+    // "Also teach Chesky": save this answer for the question it responded to.
+    let taught = null;
+    if (b.teach && b.teach.q && b.teach.a) {
+      const alts = Array.isArray(b.teach.alts) ? b.teach.alts : [];
+      const r = await teach(env, { qs: [b.teach.q, ...alts], r: b.teach.a });
+      taught = r.error ? { error: r.error } : { id: r.entry.id };
+    }
+    return json({ ok: true, emailed, taught, conv }, 200, h);
   }
   if (path === '/admin/status') {
     conv.status = b.status === 'closed' ? 'closed' : 'open';
@@ -227,6 +345,8 @@ export default {
       if (url.pathname === '/handoff' && request.method === 'POST') return await handoff(request, env, h);
       if (url.pathname === '/send' && request.method === 'POST') return await send(request, env, h);
       if (url.pathname === '/poll' && request.method === 'GET') return await poll(url, env, h);
+      if (url.pathname === '/learned' && request.method === 'GET') return await learnedPublic(env, h);
+      if (url.pathname === '/log' && request.method === 'POST') return await logEvent(request, env, h);
       return json({ error: 'Not found' }, 404, h);
     } catch (err) {
       console.error('chat worker error', err && err.message);
