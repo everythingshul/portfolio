@@ -41,9 +41,11 @@ To change project copy, order, links or media: edit PROJECTS in tools/build.py, 
 Dark theme (client prefers it; do not switch back to a light theme): near-black navy background
 (`#0a0f1a`), panels `#0d1526`/`#121d35`, light text, cyan `#25a9ea` buttons with dark text, brand
 navy `#2f5596`. Newsreader serif headlines, Instrument Sans body (self-hosted). The layout is
-deliberately editorial and plain: no gradients, glows, glass cards, icon tiles, fake browser
-chrome, or scroll animations. The client asked for a design that does not look AI-generated; keep it
-that way. Showcase cards stay side by side on phones (explicit client request; feature lists are
+deliberately editorial: no glass cards, icon tiles or fake browser chrome. The client asked for a
+design that does not look AI-generated, and ALSO wants lots of animation: headline words sliding in,
+staggered scroll reveals, wipe-in media, parallax, drifting glow, a project-name ticker, a scroll
+progress bar, hover effects (all in css/style.css "motion" section + js/main.js; reduced-motion safe).
+Keep adding motion in that spirit. Showcase cards stay side by side on phones (explicit client request; feature lists are
 hidden there to make room).
 
 **Never state a project count in copy** (e.g. "six platforms"): the client keeps adding projects.
