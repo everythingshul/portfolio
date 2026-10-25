@@ -1,6 +1,6 @@
 # Chat worker
 
-Answers the website chat widget with Claude. The widget works without this (it falls back to
+Answers the website chat widget (Chesky) with Claude. The widget works without this (it falls back to
 built-in answers); deploying it upgrades the answers to natural language.
 
 ## One-time setup

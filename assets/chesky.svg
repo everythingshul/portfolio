@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Chesky">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f5596"/>
+      <stop offset="1" stop-color="#1c3764"/>
+    </linearGradient>
+    <clipPath id="round"><circle cx="100" cy="100" r="100"/></clipPath>
+    <style>
+      .blink { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; }
+      @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+    </style>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect width="200" height="200" fill="url(#bg)"/>
+
+    <!-- jacket and shirt -->
+    <path d="M18 200 C20 160 52 146 100 146 C148 146 180 160 182 200 Z" fill="#14161c"/>
+    <path d="M78 146 L100 176 L122 146 Z" fill="#f4f7fc"/>
+    <path d="M78 146 L88 150 L100 176 Z M122 146 L112 150 L100 176 Z" fill="#dfe6f2"/>
+
+    <!-- neck -->
+    <rect x="86" y="128" width="28" height="26" rx="8" fill="#e3b790"/>
+
+    <!-- peyos (behind the face edge, in front of the cheeks) -->
+    <g fill="none" stroke="#2b1d16" stroke-width="7" stroke-linecap="round">
+      <path d="M62 70 C54 86 56 104 62 118 C66 126 58 134 52 128 C47 122 54 116 59 121"/>
+      <path d="M138 70 C146 86 144 104 138 118 C134 126 142 134 148 128 C153 122 146 116 141 121"/>
+    </g>
+
+    <!-- face -->
+    <ellipse cx="100" cy="94" rx="39" ry="44" fill="#f0c8a2"/>
+    <ellipse cx="68" cy="100" rx="5" ry="8" fill="#e6b88f"/>
+    <ellipse cx="132" cy="100" rx="5" ry="8" fill="#e6b88f"/>
+
+    <!-- beard -->
+    <path d="M61 96 C58 126 74 160 100 162 C126 160 142 126 139 96 C134 108 124 112 100 112 C76 112 66 108 61 96 Z" fill="#33231a"/>
+    <path d="M61 96 C58 126 74 160 100 162 C126 160 142 126 139 96" fill="none" stroke="#2b1d16" stroke-width="3" stroke-linejoin="round"/>
+    <!-- moustache -->
+    <path d="M77 112 C86 104 94 108 100 111 C106 108 114 104 123 112 C114 118 106 115 100 114 C94 115 86 118 77 112 Z" fill="#2b1d16"/>
+    <!-- smile -->
+    <path d="M88 124 C94 132 106 132 112 124 C106 127 94 127 88 124 Z" fill="#fff"/>
+    <path d="M88 124 C94 129 106 129 112 124" fill="none" stroke="#5b3a2c" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- nose -->
+    <path d="M96 94 C94 102 95 105 100 106 C105 105 106 102 104 94" fill="none" stroke="#dcae88" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- eyes and brows -->
+    <g class="blink"><ellipse cx="85" cy="86" rx="4.2" ry="5" fill="#241812"/><circle cx="86.4" cy="84.2" r="1.4" fill="#fff"/></g>
+    <g class="blink"><ellipse cx="115" cy="86" rx="4.2" ry="5" fill="#241812"/><circle cx="116.4" cy="84.2" r="1.4" fill="#fff"/></g>
+    <path d="M75 76 C80 71 88 71 93 75" fill="none" stroke="#2b1d16" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M107 75 C112 71 120 71 125 76" fill="none" stroke="#2b1d16" stroke-width="3.6" stroke-linecap="round"/>
+
+    <!-- hat -->
+    <ellipse cx="100" cy="64" rx="64" ry="13" fill="#0c0d11"/>
+    <path d="M64 62 C62 38 64 22 72 17 C82 12 118 12 128 17 C136 22 138 38 136 62 C122 70 78 70 64 62 Z" fill="#14161c"/>
+    <path d="M66 54 C80 61 120 61 134 54 L135 61 C121 69 79 69 65 61 Z" fill="#2a2d36"/>
+    <path d="M74 20 C84 15 116 15 126 20 C118 18 82 18 74 20 Z" fill="#2a2d36"/>
+  </g>
+</svg>

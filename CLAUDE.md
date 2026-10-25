@@ -132,7 +132,9 @@ and footer.
    `ENDPOINT` in `js/main.js`, update it.
 4. **Logo:** `assets/logo.png` is the sharp logo taken from kipashairbp.org's footer.
 
-5. **Chat bot:** widget is live with built-in answers. `worker/chat/` (Claude via the Anthropic SDK,
+5. **Chat bot ("Chesky"):** the assistant is named Chesky and shown as a friendly illustrated Hasidic man
+   (assets/chesky.svg: black hat, beard, peyos). Keep the depiction respectful, never caricatured. He
+   introduces himself as a virtual assistant. Widget is live with built-in answers. `worker/chat/` (Claude via the Anthropic SDK,
    model `claude-opus-5-5` by default, `MODEL` var can be set to `claude-haiku-5-5` for cost) is written
    but needs the client's Anthropic API key and deploy (see `worker/chat/README.md`), then `ENDPOINT`
    in `js/chat.js` must be set. Keep the built-in answers honest: never invent prices or timelines.

@@ -1,4 +1,4 @@
-/* Site chat widget.
+/* Site chat widget ("Chesky").
  * Works on its own with built-in answers about the projects. If ENDPOINT is set to the deployed
  * chat Worker (worker/chat), answers come from Claude instead, and fall back to the built-ins
  * whenever the Worker can't be reached. */
@@ -47,7 +47,9 @@
     if (best) return projectReply(best.p);
 
     if (has(t, [' hi ', ' hello', ' hey', 'shalom', 'good morning', 'good evening']))
-      return { text: "Hi! I'm the Everything Shul assistant. We build custom software for nonprofits. What would you like to know?", chips: CHIPS };
+      return { text: "Hi, I'm Chesky, Everything Shul's assistant. We build custom software for nonprofits. What would you like to know?", chips: CHIPS };
+    if (has(t, ['your name', 'who are you', 'who is chesky', 'chesky', 'are you a bot', 'are you real', 'are you human', 'are you ai']))
+      return { text: "I'm Chesky, Everything Shul's virtual assistant. I can tell you about our work and how we operate, and I'll point you to the team for anything I can't answer.", chips: CHIPS };
     if (has(t, ['thank', 'thanks', ' thx']))
       return { text: "You're welcome! Anything else I can help with?", chips: CHIPS };
     if (has(t, [' bye', 'goodbye', 'see you']))
@@ -89,20 +91,22 @@
     .replace(/([\w.+-]+@[\w-]+\.[\w.]+[\w])/g, '<a href="mailto:$1">$1</a>')
     .replace(/\n/g, '<br>');
 
+  const AVATAR = 'assets/chesky.svg';
   const fab = el('button', 'chat-fab',
     '<span class="chat-fab-ring"></span>' +
-    '<svg class="chat-ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>' +
+    `<img class="chat-face" src="${AVATAR}" alt="" width="58" height="58">` +
+    '<span class="chat-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></span>' +
     '<svg class="chat-ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>');
   fab.type = 'button';
-  fab.setAttribute('aria-label', 'Open chat');
+  fab.setAttribute('aria-label', 'Chat with Chesky');
   fab.setAttribute('aria-expanded', 'false');
 
-  const nudge = el('div', 'chat-nudge', 'Questions? Ask us anything.');
+  const nudge = el('div', 'chat-nudge', "Hi, I'm Chesky. Ask me anything!");
   const panel = el('section', 'chat-panel');
   panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', 'Chat with Everything Shul');
+  panel.setAttribute('aria-label', 'Chat with Chesky');
   panel.innerHTML =
-    '<header class="chat-head"><img src="assets/favicon-32.png" alt="" width="32" height="32"><div><strong>Everything Shul</strong><span><i></i>Ask us about our work</span></div>' +
+    `<header class="chat-head"><img src="${AVATAR}" alt="" width="38" height="38"><div><strong>Chesky</strong><span><i></i>Everything Shul's assistant</span></div>` +
     '<button type="button" class="chat-x" aria-label="Close chat">×</button></header>' +
     '<div class="chat-log" aria-live="polite"></div>' +
     '<div class="chat-chips"></div>' +
@@ -119,7 +123,13 @@
   const addMessage = (m, animate = true) => {
     const row = el('div', `chat-msg ${m.role}${animate ? ' pop' : ''}`);
     const bubble = el('div', 'chat-bubble', m.role === 'bot' ? autolink(m.text) : esc(m.text));
-    row.appendChild(bubble);
+    let body = row;
+    if (m.role === 'bot') {
+      row.appendChild(el('img', 'chat-av')).src = AVATAR;
+      body = el('div', 'chat-body');
+      row.appendChild(body);
+    }
+    body.appendChild(bubble);
     if (m.links && m.links.length) {
       const wrap = el('div', 'chat-links');
       m.links.forEach((l) => {
@@ -129,7 +139,7 @@
         if (l.href.startsWith('#')) a.addEventListener('click', () => close());
         wrap.appendChild(a);
       });
-      row.appendChild(wrap);
+      body.appendChild(wrap);
     }
     log.appendChild(row);
     scroll();
@@ -149,7 +159,7 @@
   };
 
   const typing = () => {
-    const row = el('div', 'chat-msg bot pop typing', '<div class="chat-bubble"><span></span><span></span><span></span></div>');
+    const row = el('div', 'chat-msg bot pop typing', `<img class="chat-av" src="${AVATAR}" alt=""><div class="chat-body"><div class="chat-bubble"><span></span><span></span><span></span></div></div>`);
     log.appendChild(row);
     scroll();
     return row;
@@ -208,7 +218,7 @@
     nudge.classList.remove('show');
     try { sessionStorage.setItem(STORE + '-nudged', '1'); } catch (e) { /* ignore */ }
     if (!history.length) {
-      const hello = { role: 'bot', text: "Hi! I can tell you about the platforms we've built, how we work, or put you in touch with the team.", links: [], chips: CHIPS };
+      const hello = { role: 'bot', text: "Hi, I'm Chesky! I can tell you about the platforms we've built, how we work, or put you in touch with the team.", links: [], chips: CHIPS };
       history.push(hello);
       addMessage(hello);
       setChips(hello.chips);
@@ -221,7 +231,7 @@
     panel.classList.remove('open');
     fab.classList.remove('open');
     fab.setAttribute('aria-expanded', 'false');
-    fab.setAttribute('aria-label', 'Open chat');
+    fab.setAttribute('aria-label', 'Chat with Chesky');
   }
 
   fab.addEventListener('click', () => (isOpen ? close() : open()));
