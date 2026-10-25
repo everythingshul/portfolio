@@ -31,22 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     mobileNav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileNav));
   }
 
-  /* ---------- scroll reveal ---------- */
-  const revealEls = document.querySelectorAll('.reveal');
-  if ('IntersectionObserver' in window && revealEls.length) {
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('in-view');
-          io.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.14, rootMargin: '0px 0px -60px 0px' });
-    revealEls.forEach(el => io.observe(el));
-  } else {
-    revealEls.forEach(el => el.classList.add('in-view'));
-  }
-
   /* ---------- auto-panning screenshot reels ---------- */
   document.querySelectorAll('.scroll-window img').forEach(img => {
     const setup = () => {
@@ -63,12 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     if (img.complete && img.naturalWidth) {
       setup();
-      img.closest('.scroll-window')?.querySelector('.fallback')?.remove();
     } else {
-      img.addEventListener('load', () => {
-        setup();
-        img.closest('.scroll-window')?.querySelector('.fallback')?.remove();
-      });
+      img.addEventListener('load', setup);
       img.addEventListener('error', () => {
         img.style.display = 'none';
       });
@@ -129,6 +109,47 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeLightbox();
+  });
+
+  /* ---------- share buttons ---------- */
+  /* Shares the project's /share/<id>/ page, which carries the thumbnail (Open Graph) tags. */
+  const SHARE_BASE = 'https://everythingshul.com/share/';
+
+  const copyText = async (text) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  };
+
+  document.querySelectorAll('.share-btn').forEach(btn => {
+    const label = btn.querySelector('span');
+    btn.addEventListener('click', async () => {
+      const url = `${SHARE_BASE}${btn.dataset.id}/`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: btn.dataset.title, text: btn.dataset.text, url });
+          return;
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+      try {
+        await copyText(url);
+        label.textContent = 'Link copied';
+      } catch (err) {
+        label.textContent = 'Copy failed';
+      }
+      setTimeout(() => { label.textContent = 'Share'; }, 2000);
+    });
   });
 
   /* ---------- contact form ---------- */
