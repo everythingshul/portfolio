@@ -6,6 +6,7 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let token = '';
   try { token = localStorage.getItem(KEY) || ''; } catch (e) { /* ignore */ }
+  window.esToast = (m) => toast(m);
   let current = null;   // open conversation id
   let tab = 'chats';
   let timer = null;
@@ -45,8 +46,11 @@
     document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
     $('layout').hidden = name !== 'chats';
     $('teach').hidden = name !== 'teach';
+    $('analytics').hidden = name !== 'analytics';
+    if (window.ESAnalytics && name !== 'analytics') window.ESAnalytics.hide();
     if (name === 'teach') { history.replaceState(null, '', '#teach'); loadTeach(); }
-    else if (location.hash === '#teach') history.replaceState(null, '', location.pathname);
+    else if (name === 'analytics') { history.replaceState(null, '', '#analytics'); window.ESAnalytics.show(api, API, () => token); }
+    else if (location.hash === '#teach' || location.hash === '#analytics') history.replaceState(null, '', location.pathname);
   }
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
 
@@ -196,6 +200,7 @@
       loadTeachCount();
       const h = location.hash.slice(1);
       if (h === 'teach') setTab('teach');
+      else if (h === 'analytics') setTab('analytics');
       else if (h && !$('app').hidden) openConv(h);
     });
     clearInterval(timer);

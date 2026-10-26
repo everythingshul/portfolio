@@ -51,8 +51,35 @@ s = re.sub(r'(binding = "CHAT"\nid = )"[^"]*"', r'\1"%s"' % sys.argv[1], s)
 open(p, 'w').write(s)
 PY
 
+echo "3b/5 Analytics storage (D1)..."
+# Needs the token to have "D1: Edit". Without it, analytics stays off and the rest still deploys.
+D1_ID=$(cf "$API/d1/database?name=everythingshul-stats" | pj "
+assert d.get('success'), 'D1 not allowed: ' + str(d.get('errors'))
+print(next((x['uuid'] for x in d.get('result', []) if x['name']=='everythingshul-stats'), ''))" 2>/dev/null || echo "DENIED")
+if [ "$D1_ID" = "DENIED" ]; then
+  echo "   !! The token cannot use D1. Add the permission Account > D1 > Edit to the token and re-run."
+  echo "   !! Skipping the chat Worker deploy so the placeholder database id does not break it."
+  SKIP_CHAT=1
+else
+  if [ -z "$D1_ID" ]; then
+    D1_ID=$(cf -X POST "$API/d1/database" -d '{"name":"everythingshul-stats"}' | pj "assert d.get('success'), d.get('errors'); print(d['result']['uuid'])")
+    echo "   created database"
+  else
+    echo "   found existing database"
+  fi
+  python3 - "$D1_ID" <<'PY'
+import re, sys
+p = 'worker/chat/wrangler.toml'
+s = open(p).read()
+s = re.sub(r'(database_id = )"[^"]*"', r'\1"%s"' % sys.argv[1], s)
+open(p, 'w').write(s)
+PY
+  (cd worker/chat && $WR d1 execute everythingshul-stats --remote --file=schema.sql 2>&1 | grep -E "Executed|error|Error" || true)
+fi
+
 echo "4/5 Deploying the Workers..."
 for d in worker worker/chat; do
+  if [ "$d" = "worker/chat" ] && [ "${SKIP_CHAT:-0}" = "1" ]; then echo "   -> $d skipped"; continue; fi
   echo "   -> $d"
   (cd "$d" && $WR deploy 2>&1 | grep -E "Deployed|https://|Error|error" || true)
 done

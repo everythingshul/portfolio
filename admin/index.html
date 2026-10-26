@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Chat inbox — Everything Shul</title>
+<title>Inbox and analytics — Everything Shul</title>
 <link rel="icon" href="/favicon.ico?v=3" sizes="any" />
 <link rel="stylesheet" href="../css/style.css" />
 <style>
@@ -72,6 +72,87 @@
   .reply .check { display: flex; gap: 8px; align-items: center; }
   .reply input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; font-size: 0.9rem; }
   .teach-box textarea { min-height: 60px; }
+
+  /* analytics */
+  .adm.wide { max-width: 1320px; }
+  #analytics { --good: #6fd08c; --okc: #e0b44c; --poor: #ef7a6f; }
+  #analytics .abar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 14px; }
+  #analytics .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  #analytics .chip, #analytics .stab { padding: 7px 13px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--ink-2); font: inherit; font-size: 0.85rem; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+  #analytics .chip:hover, #analytics .stab:hover { color: var(--ink); border-color: var(--ink-3); }
+  #analytics .chip.on { background: var(--cyan); border-color: var(--cyan); color: var(--on-cyan); }
+  #analytics .custom { display: flex; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--ink-3); }
+  #analytics .custom input[type=date] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; font-size: 0.85rem; color-scheme: dark; }
+  #analytics .check { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; color: var(--ink-2); cursor: pointer; }
+  #analytics .asub { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
+  #analytics .stab.on { color: var(--ink); background: rgba(37,169,234,0.14); border-color: var(--cyan); }
+  #analytics .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  #analytics .kpis.one { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-bottom: 0; }
+  #analytics .kpi { border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); padding: 14px 16px; }
+  #analytics .kv { font-family: 'Newsreader', serif; font-size: 1.9rem; line-height: 1.1; color: var(--ink); }
+  #analytics .kv small { font-size: 0.9rem; color: var(--ink-3); }
+  #analytics .kl { font-size: 0.8rem; color: var(--ink-3); margin-top: 4px; }
+  #analytics .kd { min-height: 1.1em; margin-top: 6px; font-size: 0.78rem; }
+  #analytics .dl { color: var(--ink-3); }
+  #analytics .dl.up { color: var(--good); }
+  #analytics .dl.down { color: var(--poor); }
+  #analytics .insights { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 4px 0 16px; color: var(--ink-2); font-size: 0.92rem; }
+  #analytics .acard { border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); padding: 16px 18px; margin-bottom: 14px; min-width: 0; }
+  #analytics .acard h3 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 1.15rem; color: var(--ink); margin-bottom: 4px; }
+  #analytics .anote { color: var(--ink-3); font-size: 0.8rem; margin: 2px 0 12px; max-width: 60em; }
+  #analytics .acard > h3 + :not(.anote) { margin-top: 12px; }
+  #analytics .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  #analytics .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  #analytics .aempty { padding: 22px 8px; text-align: center; color: var(--ink-3); font-size: 0.9rem; }
+  #analytics .bars { display: flex; flex-direction: column; gap: 9px; }
+  #analytics .bar { display: grid; grid-template-columns: minmax(80px, 38%) 1fr auto; gap: 10px; align-items: center; font-size: 0.86rem; }
+  #analytics .bl { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #analytics .bt, #analytics .ft { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  #analytics .bt i, #analytics .ft i { display: block; height: 100%; border-radius: 4px; background: var(--cyan); animation: abar .7s ease-out; transform-origin: left; }
+  @keyframes abar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  #analytics .bv { color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #analytics .bv small { color: var(--ink-3); margin-left: 4px; }
+  #analytics .funnel { display: flex; flex-direction: column; gap: 12px; }
+  #analytics .fh { display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--ink-2); margin-bottom: 5px; }
+  #analytics .fh b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+  #analytics .ft { height: 12px; }
+  #analytics .fs { font-size: 0.75rem; color: var(--ink-3); margin-top: 4px; }
+  #analytics .tscroll { overflow-x: auto; }
+  #analytics .atable { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  #analytics .atable th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 0.76rem; padding: 6px 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  #analytics .atable td { padding: 8px 10px; border-bottom: 1px solid var(--rule); color: var(--ink-2); vertical-align: top; }
+  #analytics .atable tr:last-child td { border-bottom: none; }
+  #analytics .atable .n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #analytics .legend { display: flex; gap: 16px; margin: 6px 0 4px; font-size: 0.82rem; color: var(--ink-2); }
+  #analytics .lg { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  #analytics .lg i, #analytics .tip i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  #analytics .chartwrap { position: relative; }
+  #analytics .chartwrap svg { width: 100%; height: auto; display: block; }
+  #analytics .gl { stroke: rgba(255,255,255,0.07); stroke-width: 1; }
+  #analytics .gt { fill: var(--ink-3); font-size: 11px; }
+  #analytics .guide { stroke: var(--ink-3); stroke-dasharray: 3 3; }
+  #analytics .tip { display: none; position: absolute; top: 8px; min-width: 130px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink-2); font-size: 0.8rem; pointer-events: none; }
+  #analytics .tip b { display: block; color: var(--ink); margin-bottom: 3px; }
+  #analytics .heat { overflow-x: auto; }
+  #analytics .hrow { display: grid; grid-template-columns: 34px repeat(24, minmax(10px, 1fr)); gap: 3px; margin-bottom: 3px; min-width: 520px; }
+  #analytics .hrow span { font-size: 0.68rem; color: var(--ink-3); text-align: center; white-space: nowrap; }
+  #analytics .hrow .hd { text-align: left; line-height: 20px; }
+  #analytics .hc { height: 20px; border-radius: 3px; }
+  #analytics .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  #analytics .vcard { border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 12px 14px; }
+  #analytics .vcard.good { border-left-color: var(--good); }
+  #analytics .vcard.ok { border-left-color: var(--okc); }
+  #analytics .vcard.poor { border-left-color: var(--poor); }
+  #analytics .vn { font-size: 0.8rem; color: var(--ink-3); }
+  #analytics .vv { font-family: 'Newsreader', serif; font-size: 1.7rem; color: var(--ink); }
+  #analytics .vh { font-size: 0.76rem; color: var(--ink-3); margin-top: 2px; }
+  #analytics .feed, #analytics .steps { list-style: none; padding: 0; margin: 0; font-size: 0.86rem; color: var(--ink-2); }
+  #analytics .feed li, #analytics .steps li { padding: 6px 0; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+  #analytics .feed time, #analytics .steps time { display: inline-block; min-width: 46px; color: var(--ink-3); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+  #analytics .plain { padding-left: 18px; color: var(--ink-2); font-size: 0.9rem; line-height: 1.7; }
+  #analytics .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  #analytics code { background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; }
+  @media (max-width: 860px) { #analytics .grid2, #analytics .grid3 { grid-template-columns: 1fr; } }
   @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; }
     .layout.open .list { display: none; }
@@ -95,17 +176,19 @@
 
   <section id="app" hidden>
     <div class="adm-top">
-      <h1>Chat inbox</h1>
+      <h1>Admin</h1>
       <div class="meta"><span id="status">Loading…</span><button class="small-btn" id="logout">Sign out</button></div>
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="chats">Chats <span class="count" id="tab-chats"></span></button>
       <button class="tab" data-tab="teach">Teach Chesky <span class="count" id="tab-teach"></span></button>
+      <button class="tab" data-tab="analytics">Analytics</button>
     </div>
     <div class="layout" id="layout">
       <div class="list" id="list"></div>
       <div class="conv" id="conv"><div class="empty">Pick a conversation to read it.</div></div>
     </div>
+    <div id="analytics" hidden></div>
     <div id="teach" hidden>
       <p class="lead">Chesky only learns what you teach him. Below are questions he couldn't answer and answers visitors gave a thumbs-down. Write the answer once and he'll use it for similar questions from then on. Nothing a visitor types ever becomes an answer without you.</p>
       <h2>To teach <span class="count" id="n-unans"></span></h2>
@@ -117,6 +200,8 @@
 </main>
 <div class="toast" id="toast" hidden></div>
 <script src="../js/chat-config.js"></script>
+<script src="../js/chat-kb.js"></script>
+<script src="analytics.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

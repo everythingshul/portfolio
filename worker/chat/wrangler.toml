@@ -10,12 +10,26 @@ SITE_URL = "https://everythingshul.com"
 ADMIN_EMAIL = "everythingshul@gmail.com"
 SENDER_EMAIL = "support@mail.everythingshul.com"
 SENDER_NAME = "Everything Shul"
+# Weekly summary email to ADMIN_EMAIL: "on" or "off".
+DIGEST = "on"
+# How long analytics are kept.
+RETENTION_DAYS = "395"
 
 # Conversation storage. Create it once with:  npx wrangler kv namespace create CHAT
 # then paste the printed id below.
 [[kv_namespaces]]
 binding = "CHAT"
 id = "149cbf4cdbe64dcb8801de42326321ec"
+
+# Analytics database (Cloudflare D1). tools/deploy-workers.sh creates it and fills in the id.
+[[d1_databases]]
+binding = "STATS"
+database_name = "everythingshul-stats"
+database_id = "PASTE_D1_DATABASE_ID_HERE"
+
+# Daily cleanup of old analytics data and the Monday morning summary email.
+[triggers]
+crons = ["30 5 * * *", "0 13 * * 1"]
 
 # Secrets (never committed):
 #   npx wrangler secret put BREVO_API_KEY

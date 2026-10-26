@@ -6,12 +6,14 @@
 //     GET  /poll      fetch messages the visitor hasn't seen yet
 //     GET  /learned  answers the team has taught Chesky (public, read-only)
 //     POST /log      anonymous "I couldn't answer this" / thumbs up / thumbs down events
+//     POST /t        site analytics events (see stats.js)
 //   Admin side (Bearer ADMIN_TOKEN; used by /admin/ on the site):
 //     GET  /admin/list, GET /admin/conv, POST /admin/reply, POST /admin/status, POST /admin/delete
 //     GET  /admin/learn, POST /admin/teach, POST /admin/forget, POST /admin/dismiss   (teaching Chesky)
 //
 // Conversations live in the CHAT KV namespace. Email goes out through Brevo.
-import { adminNotification, customerConfirmation, customerReply } from './emails.js';
+import { adminNotification, customerConfirmation, customerReply, digestEmail } from './emails.js';
+import { ingest, computeStats, liveStats, recentSessions, sessionTimeline, exportCsv, resetStats, purgeOld } from './stats.js';
 
 const MAX_TEXT = 1500;
 const MAX_MESSAGES = 300;
@@ -266,6 +268,30 @@ async function admin(request, url, env, h) {
     return json(conv, 200, h);
   }
 
+  if (path.startsWith('/admin/stats')) {
+    if (!env.STATS) return json({ error: 'Analytics storage is not set up yet.' }, 503, h);
+    const sp = url.searchParams;
+    const now = Date.now();
+    const from = Math.max(0, parseInt(sp.get('from') || '0', 10) || now - 7 * 86400000);
+    const to = Math.max(from + 1, parseInt(sp.get('to') || '0', 10) || now + 1);
+    if (path === '/admin/stats' && request.method === 'GET') {
+      const tz = Math.max(-840, Math.min(840, parseInt(sp.get('tz') || '0', 10) || 0));
+      return json(await computeStats(env.STATS, { from, to, tz, compare: sp.get('cmp') !== '0' }), 200, h);
+    }
+    if (path === '/admin/stats/live') return json(await liveStats(env.STATS), 200, h);
+    if (path === '/admin/stats/sessions') return json({ sessions: await recentSessions(env.STATS, from, to) }, 200, h);
+    if (path === '/admin/stats/session') {
+      const t = await sessionTimeline(env.STATS, sp.get('sid'));
+      return t ? json(t, 200, h) : json({ error: 'Not found' }, 404, h);
+    }
+    if (path === '/admin/stats/export') {
+      const csv = await exportCsv(env.STATS, sp.get('kind') === 'events' ? 'events' : 'sessions', from, to);
+      return new Response(csv, { status: 200, headers: { ...h, 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
+    if (path === '/admin/stats/reset' && request.method === 'POST') { await resetStats(env.STATS); return json({ ok: true }, 200, h); }
+    return json({ error: 'Not found' }, 404, h);
+  }
+
   if (path === '/admin/learn' && request.method === 'GET') {
     const un = await getUnans(env);
     const unanswered = Object.keys(un).map((k) => ({ key: k, ...un[k] }))
@@ -333,7 +359,28 @@ async function admin(request, url, env, h) {
   return json({ error: 'Not found' }, 404, h);
 }
 
+// Weekly summary email (Mondays) and daily cleanup of old analytics data.
+async function sendDigest(env) {
+  const to = Date.now();
+  const from = to - 7 * 86400000;
+  const d = await computeStats(env.STATS, { from, to, tz: 0, compare: true });
+  const fmt = (t) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  await brevo(env, {
+    to: [{ email: env.ADMIN_EMAIL }],
+    subject: `Your week on the website: ${d.totals.visitors} visitors, ${d.totals.pageviews} pageviews`,
+    htmlContent: digestEmail(d, env.SITE_URL, `${env.SITE_URL}/admin/#analytics`, `${fmt(from)} to ${fmt(to)}`),
+  });
+}
+
 export default {
+  async scheduled(event, env) {
+    if (!env.STATS) return;
+    try {
+      if (event.cron === '0 13 * * 1') { if ((env.DIGEST || 'on') !== 'off') await sendDigest(env); }
+      else await purgeOld(env.STATS, env);
+    } catch (e) { console.error('scheduled', event.cron, e && e.message); }
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
@@ -348,6 +395,7 @@ export default {
       if (url.pathname === '/poll' && request.method === 'GET') return await poll(url, env, h);
       if (url.pathname === '/learned' && request.method === 'GET') return await learnedPublic(env, h);
       if (url.pathname === '/log' && request.method === 'POST') return await logEvent(request, env, h);
+      if (url.pathname === '/t' && request.method === 'POST') return await ingest(request, env, h);
       return json({ error: 'Not found' }, 404, h);
     } catch (err) {
       console.error('chat worker error', err && err.message);

@@ -12,6 +12,8 @@
   const EMAIL = 'everythingshul@gmail.com';
   const KB = window.ES_KB;
   if (!KB) return;
+  // Analytics: only topic ids and counts, never what the visitor typed.
+  const T = (name, extra) => { try { if (window.esTrack) window.esTrack('ch', name, extra ? { x: extra } : undefined); } catch (e) { /* ignore */ } };
 
   const onHome = !!document.getElementById('work');
   const AVATAR = 'assets/chesky.svg';
@@ -525,6 +527,7 @@
   // Thumbs: tell the team how an answer landed so they can fix or teach it.
   const onFeedback = (m, kind, fb) => {
     logEvent(kind, m.q || '', m.entry || '');
+    T(kind, { e: m.entry || '' });
     fb.innerHTML = `<span class="chat-fb-done">${kind === 'up' ? 'Glad that helped!' : 'Thanks, I noted that.'}</span>`;
     if (kind === 'down') {
       const msg = { role: 'bot', text: "Sorry about that. Want me to pass your question to the team? They can answer it properly, and it helps them teach me for next time.", chips: [TEAM, 'No thanks'], links: [] };
@@ -619,6 +622,7 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.id) throw new Error(data.error || 'failed');
         lsSet(CONV, data.id);
+        T('handoff');
         row.remove();
         enterHumanMode({ id: data.id, known: data.count || 0 });
         const total = state.history.length;
@@ -727,7 +731,8 @@
     text = text.trim();
     if (!text || busy) return;
     input.value = '';
-    if (human) { await sendToTeam(text); return; }
+    if (human) { T('human'); await sendToTeam(text); return; }
+    T('send');
     busy = true;
     setChips([]);
     log.querySelectorAll('.chat-fb').forEach((x) => x.remove());
@@ -738,6 +743,13 @@
     const started = Date.now();
 
     let reply = respondAll(text, state);
+    if (reply) {
+      if (reply.entry === 'util') T('tool'); else T('match', { e: reply.entry || 'other' });
+    } else if (isRandomQuestion(text)) {
+      T('match', { e: 'random' });
+    } else {
+      T('miss');
+    }
     if (reply) {
       state.misses = 0; state.randoms = 0;
       if (reply.project) { state.project = reply.project; state.turnsSinceProject = 0; } else { state.turnsSinceProject++; }
@@ -768,6 +780,7 @@
     state.history.push(m);
     addMessage(m);
     state.pending = reply.action === 'offer' ? 'offer' : null;
+    if (reply.action === 'offer' || reply.action === 'handoff') T('offer');
     if (reply.action === 'handoff') {
       if (!ENDPOINT && !EMAIL) { /* unreachable */ }
       addMessage({ form: true });
@@ -784,6 +797,7 @@
   /* ====================================================================== open / close */
   let isOpen = false;
   const open = () => {
+    if (!isOpen) T('open');
     isOpen = true;
     panel.classList.add('open');
     fab.classList.add('open');
