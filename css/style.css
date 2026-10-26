@@ -674,3 +674,11 @@ html.no-motion .project::before { transform: none !important; }
 .chat-fb button[data-k='down']:hover { color: #ff8a80; background: rgba(255, 138, 128, 0.12); }
 .chat-fb svg { width: 15px; height: 15px; }
 .chat-fb-done { font-size: 0.76rem; color: var(--ink-3); padding: 4px 2px; }
+
+/* privacy page */
+.prose { max-width: 44rem; padding: 40px 0 80px; }
+.prose h2 { font-size: 1.5rem; margin: 2.2rem 0 0.6rem; }
+.prose h2:first-child { margin-top: 0; }
+.prose p, .prose li { color: var(--ink-2); line-height: 1.7; }
+.prose ul { padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.prose a { color: var(--cyan-ink); }

@@ -74,3 +74,41 @@ ${quote(text)}
 <p style="margin:0 0 24px;font-size:13px;color:${C.muted};">You can also just reply to this email.</p>`;
   return shell({ siteUrl, preheader: text.slice(0, 100), title: 'Reply from Everything Shul', content });
 }
+
+// Weekly summary for the team.
+export function digestEmail(d, siteUrl, link, label) {
+  const t = d.totals, pr = d.previous || {};
+  const delta = (a, b, lowerIsBetter) => {
+    if (b == null || !isFinite(b)) return '';
+    if (!b) return a ? ' <span style="color:#4c7a4f;">new</span>' : '';
+    const ch = Math.round(((a - b) / b) * 100);
+    if (!ch) return ' <span style="color:' + C.muted + ';">no change</span>';
+    const good = lowerIsBetter ? ch < 0 : ch > 0;
+    return ' <span style="color:' + (good ? '#4c7a4f' : '#a6432f') + ';">' + (ch > 0 ? '+' : '') + ch + '%</span>';
+  };
+  const mins = (s) => (s >= 60 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : s + 's');
+  const kpi = (name, val, extra) =>
+    `<td style="padding:12px 10px;text-align:center;border:1px solid ${C.border};background:${C.panel2};"><div style="font-family:Georgia,serif;font-size:26px;color:${C.dark};">${val}</div><div style="font-size:12px;color:${C.muted};text-transform:uppercase;letter-spacing:.05em;">${esc(name)}</div><div style="font-size:12px;">${extra || ''}</div></td>`;
+  const list = (rows, a, b) => rows.length
+    ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">' + rows.map((r) => `<tr><td style="padding:7px 0;border-bottom:1px solid ${C.border};">${esc(a(r))}</td><td style="padding:7px 0;border-bottom:1px solid ${C.border};text-align:right;color:${C.dark};">${esc(b(r))}</td></tr>`).join('') + '</table>'
+    : `<p style="margin:0 0 22px;color:${C.muted};">Nothing yet.</p>`;
+  const sub = (x) => `<p style="margin:0 0 6px;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:${C.muted};">${esc(x)}</p>`;
+  const f = d.funnel || {}, chat = d.chat || {}, form = d.form || {};
+  const content = `${heading('Your week on the website')}
+<p style="margin:0 0 18px;">${esc(label)}. Compared with the week before.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="6" style="margin:0 0 24px;"><tr>
+${kpi('Visitors', t.visitors, delta(t.visitors, pr.visitors))}${kpi('Visits', t.sessions, delta(t.sessions, pr.sessions))}${kpi('Pageviews', t.pageviews, delta(t.pageviews, pr.pageviews))}
+</tr><tr>
+${kpi('Time on site', mins(t.avgEngaged), delta(t.avgEngaged, pr.avgEngaged))}${kpi('Bounce rate', t.bounceRate + '%', delta(t.bounceRate, pr.bounceRate, true))}${kpi('Pages / visit', t.pagesPerSession, '')}
+</tr></table>
+${sub('Where visitors came from')}${list(d.channels.slice(0, 6), (r) => r.channel, (r) => r.sessions + ' visits')}
+${sub('Most viewed pages')}${list(d.pages.slice(0, 6), (r) => r.path, (r) => r.views + ' views')}
+${sub('Projects people looked at')}${list(d.projects.slice(0, 6), (r) => r.proj, (r) => `${r.viewers} saw it, ${r.tour_opens || 0} watched, ${r.visits || 0} visited`)}
+${sub('What visitors did')}${list([
+    ['Contact form messages sent', form.oks || 0], ['Chats opened', chat.opens || 0], ['Chats handed to the team', chat.handoffs || 0],
+    ['Tours watched', (d.video || {}).opens || 0], ['Project links shared', f.shared || 0],
+  ], (r) => r[0], (r) => r[1])}
+<p style="margin:0 0 24px;">${button(link, 'Open the full analytics')}</p>
+<p style="margin:0 0 24px;font-size:12.5px;color:${C.muted};">These numbers count visits without cookies and never store IP addresses. Turn this email off by setting DIGEST to "off" in the chat Worker's settings.</p>`;
+  return shell({ siteUrl, preheader: `${t.visitors} visitors, ${t.pageviews} pageviews`, title: 'Weekly website summary', content });
+}

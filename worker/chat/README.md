@@ -65,3 +65,17 @@ Until step 5 is done the chat still works: "Connect me with the team" opens the 
 - Conversations are deleted after 180 days; you can also delete one from the admin page.
 - The anonymous question log keeps at most 300 questions; taught answers at most 400.
 - The conversation id is the visitor's key to their own chat, so it is long and random.
+
+
+## Analytics (D1)
+
+The Worker stores anonymous site statistics in a D1 database bound as `STATS`.
+`tools/deploy-workers.sh` creates `everythingshul-stats`, applies `schema.sql` and fills `database_id` in
+`wrangler.toml` (the token needs Account > D1 > Edit). Manually:
+
+    npx wrangler d1 create everythingshul-stats      # copy the id into wrangler.toml
+    npx wrangler d1 execute everythingshul-stats --remote --file=schema.sql
+
+Vars: `DIGEST` ("off" disables the Monday email), `RETENTION_DAYS` (default 395). Optional secret `STATS_SALT`
+(otherwise `ADMIN_TOKEN` salts the daily visitor hash). Cron: daily purge and Monday digest. View everything in
+/admin/ under Analytics.

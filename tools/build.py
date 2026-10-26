@@ -124,14 +124,14 @@ def footer():
     </div>
     <div class="footer-bottom">
       <span>© 2026 Everything Shul. All rights reserved.</span>
-      <span>everythingshul@gmail.com</span>
+      <span><a href="privacy.html">Privacy</a> · everythingshul@gmail.com</span>
     </div>
   </div>
 </footer>
 '''
 
 def chat_scripts():
-    return '<script src="js/chat-config.js" defer></script>\n<script src="js/chat-kb.js" defer></script>\n<script src="js/chat.js" defer></script>\n'
+    return '<script src="js/chat-config.js" defer></script>\n<script src="js/metrics.js" defer></script>\n<script src="js/chat-kb.js" defer></script>\n<script src="js/chat.js" defer></script>\n'
 
 def project_html(i, p):
     flip = ' flip' if i % 2 else ''
@@ -356,6 +356,49 @@ def contact_html():
 </html>
 '''
 
+def privacy_html():
+    title = 'Privacy — Everything Shul'
+    desc = 'What this website measures, what it does not, and how to opt out.'
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+{head(title, desc, og(title, desc, 'home.jpg', SITE + '/privacy.html') + '<link rel="stylesheet" href="css/style.css" />')}
+</head>
+<body>
+
+{NAV}
+<header class="page-hero">
+  <div class="container">
+    <h1>Privacy</h1>
+    <p>We count visits so we can make the site better. We do it without cookies and without tracking you.</p>
+  </div>
+</header>
+<section class="section">
+  <div class="container"><div class="prose">
+    <h2>What we measure</h2>
+    <p>Which pages are viewed, how long a page is on screen, how far down it is scrolled, which projects, tour videos and buttons get attention, whether the contact form is used, and how fast the site loads. We also note the general area (country and city), the kind of device and browser, and which website or link brought you here.</p>
+    <h2>What we do not do</h2>
+    <ul>
+      <li>No cookies and no advertising trackers. Nothing is shared with Google, Facebook or any ad network.</li>
+      <li>Your IP address is never stored. To count unique visitors, a one-way code is made from your connection details and today's date. It changes every day and cannot be traced back to you.</li>
+      <li>Names, email addresses and what you type in the chat or the contact form are never part of the statistics.</li>
+      <li>If your browser sends Do Not Track or Global Privacy Control, we count nothing at all.</li>
+    </ul>
+    <h2>How long we keep it</h2>
+    <p>Statistics are deleted automatically after 13 months.</p>
+    <h2>Contact form and chat</h2>
+    <p>If you send a message or ask to talk to the team in the chat, your message and email address go to us so we can reply. Questions the chat could not answer are saved without any personal details so we can teach it better answers.</p>
+    <h2>Questions</h2>
+    <p>Write to <a href="mailto:everythingshul@gmail.com">everythingshul@gmail.com</a> and we will answer, or delete anything you sent us.</p>
+  </div></div>
+</section>
+
+{footer()}
+{chat_scripts()}<script src="js/main.js"></script>
+</body>
+</html>
+'''
+
 def share_page(p):
     url = f"{SITE}/share/{p['id']}/"
     title = f"{p['full']} — Everything Shul"
@@ -368,6 +411,8 @@ def share_page(p):
 </head>
 <body>
 <p>Taking you to <a href="/#{p['id']}">{e(p['full'])}</a>…</p>
+<script src="/js/chat-config.js"></script>
+<script src="/js/metrics.js"></script>
 <script>location.replace('/#{p['id']}');</script>
 </body>
 </html>
@@ -377,6 +422,7 @@ if __name__ == '__main__':
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     open(os.path.join(root, 'index.html'), 'w').write(index_html())
     open(os.path.join(root, 'contact.html'), 'w').write(contact_html())
+    open(os.path.join(root, 'privacy.html'), 'w').write(privacy_html())
     for p in PROJECTS:
         d = os.path.join(root, 'share', p['id'])
         os.makedirs(d, exist_ok=True)

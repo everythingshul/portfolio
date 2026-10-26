@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
 
+  // Analytics (js/metrics.js). Never lets a tracking problem affect the site.
+  const T = (type, name, opts) => { try { if (window.esTrack) window.esTrack(type, name, opts); } catch (e) { /* ignore */ } };
+
   /* ---------- navbar scroll state ---------- */
   const navbar = document.querySelector('.navbar');
   const onScroll = () => {
@@ -77,8 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const lightboxTitle = document.getElementById('lightbox-title');
   const lightboxClose = document.querySelector('.lightbox-close');
 
-  const openLightbox = (src, title) => {
+  // Tour video analytics: opened, played, 25/50/75/100%, and how long it was watched.
+  let tour = null;
+  const openLightbox = (src, title, project) => {
     if (!lightbox || !lightboxVideo) return;
+    tour = { j: project, played: false, marks: {}, max: 0 };
+    T('vd', 'open', { j: project });
     lightboxVideo.src = src;
     lightboxVideo.currentTime = 0;
     lightboxVideo.muted = false;
@@ -90,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const closeLightbox = () => {
     if (!lightbox || !lightboxVideo) return;
+    if (tour && lightbox.classList.contains('open')) { T('vd', 'close', { j: tour.j, v: Math.round(tour.max) }); tour = null; }
     lightbox.classList.remove('open');
     lightboxVideo.pause();
     lightboxVideo.removeAttribute('src');
@@ -97,9 +105,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.style.overflow = '';
   };
 
+  if (lightboxVideo) {
+    lightboxVideo.addEventListener('play', () => { if (tour && !tour.played) { tour.played = true; T('vd', 'play', { j: tour.j }); } });
+    lightboxVideo.addEventListener('timeupdate', () => {
+      if (!tour || !lightboxVideo.duration) return;
+      tour.max = Math.max(tour.max, lightboxVideo.currentTime);
+      const pct = (lightboxVideo.currentTime / lightboxVideo.duration) * 100;
+      [25, 50, 75].forEach((m) => { if (pct >= m && !tour.marks[m]) { tour.marks[m] = 1; T('vd', 'p' + m, { j: tour.j }); } });
+    });
+    lightboxVideo.addEventListener('ended', () => { if (tour && !tour.marks[100]) { tour.marks[100] = 1; T('vd', 'p100', { j: tour.j }); } });
+  }
+
   document.querySelectorAll('.play-full').forEach(btn => {
     btn.addEventListener('click', () => {
-      openLightbox(btn.dataset.video, btn.dataset.title);
+      const proj = btn.closest('.project[id]');
+      openLightbox(btn.dataset.video, btn.dataset.title, proj ? proj.id : undefined);
     });
   });
 
@@ -245,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (navigator.share) {
         try {
           await navigator.share({ title: btn.dataset.title, text: btn.dataset.text, url });
+          T('sh', 'share', { j: btn.dataset.id, x: { m: 'native' } });
           return;
         } catch (err) {
           if (err && err.name === 'AbortError') return;
@@ -253,8 +274,10 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         await copyText(url);
         label.textContent = 'Link copied';
+        T('sh', 'share', { j: btn.dataset.id, x: { m: 'copy' } });
       } catch (err) {
         label.textContent = 'Copy failed';
+        T('sh', 'share', { j: btn.dataset.id, x: { m: 'copy_failed' } });
       }
       setTimeout(() => { label.textContent = 'Share'; }, 2000);
     });
@@ -281,9 +304,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'failed');
         form.reset();
+        T('fm', 'ok');
         if (success) success.classList.add('show');
       } catch (err) {
         // Worker unreachable: fall back to the visitor's email app so the message is never lost.
+        T('fm', 'error', { x: { e: String((err && err.message) || 'failed').slice(0, 60) } });
         const d = Object.fromEntries(new FormData(form));
         const lines = [
           `Name: ${d.name}`,
