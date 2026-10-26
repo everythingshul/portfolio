@@ -25,7 +25,7 @@ id = "149cbf4cdbe64dcb8801de42326321ec"
 [[d1_databases]]
 binding = "STATS"
 database_name = "everythingshul-stats"
-database_id = "PASTE_D1_DATABASE_ID_HERE"
+database_id = "78745e90-b210-4a7c-96da-a00c2178681c"
 
 # Daily cleanup of old analytics data and the Monday morning summary email.
 [triggers]
