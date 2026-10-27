@@ -90,12 +90,12 @@
     try {
       const c = await api('/admin/conv?id=' + encodeURIComponent(id));
       const keep = keepDraft && $('draft') ? { d: $('draft').value, t: $('teach-on') && $('teach-on').checked } : { d: '', t: false };
-      const lastQ = [...c.messages].reverse().find((m) => m.from === 'customer');
+      const lastQ = [...c.messages].reverse().find((m) => m.from === 'customer' && !m.voice);
       $('conv').innerHTML =
         `<div class="conv-head"><div><button class="small-btn back" id="back">‹ Back</button> <strong>${esc(c.name || c.email)}</strong><br><a href="mailto:${esc(c.email)}">${esc(c.email)}</a>${c.status === 'closed' ? '<span class="tag">closed</span>' : ''}</div>
            <div class="actions"><button class="small-btn" id="toggle">${c.status === 'closed' ? 'Reopen' : 'Close'}</button><button class="small-btn danger" id="del">Delete</button></div></div>
          <div class="msgs" id="msgs">${c.messages.map((m) =>
-           `<div class="m ${m.from}">${esc(m.text)}<small>${m.from === 'customer' ? 'Visitor' : m.from === 'admin' ? 'You' : 'Chesky'} · ${new Date(m.ts).toLocaleString()}</small></div>`).join('')}</div>
+           `<div class="m ${m.from}">${m.voice ? '<div class="vslot"></div>' : esc(m.text)}<small>${m.from === 'customer' ? 'Visitor' : m.from === 'admin' ? 'You' : 'Chesky'} · ${new Date(m.ts).toLocaleString()}</small></div>`).join('')}</div>
          <form class="reply" id="reply"><textarea id="draft" placeholder="Write your reply. It appears in their chat and is emailed to them." maxlength="4000"></textarea>
            <label class="check"><input type="checkbox" id="teach-on"> Also teach Chesky this answer, so he can answer similar questions himself</label>
            <div class="teach-box" id="teach-box" hidden>
@@ -112,6 +112,8 @@
       $('teach-on').checked = keep.t;
       const syncBox = () => { $('teach-box').hidden = !$('teach-on').checked; if ($('teach-on').checked && !aEdited && !$('teach-a').value) $('teach-a').value = $('draft').value; };
       $('teach-on').addEventListener('change', syncBox); syncBox();
+      const vms = c.messages.filter((m) => m.voice);
+      document.querySelectorAll('#msgs .vslot').forEach((slot, i) => { const v = vms[i].voice; slot.appendChild(window.ESVoice.player({ url: `${API}/voice?id=${encodeURIComponent(v.id)}`, dur: v.dur, peaks: v.peaks })); });
       const msgs = $('msgs'); msgs.scrollTop = msgs.scrollHeight;
       $('back').onclick = () => { $('layout').classList.remove('open'); current = null; history.replaceState(null, '', location.pathname); loadList(); };
       $('toggle').onclick = async () => { await api('/admin/status', { method: 'POST', body: { id, status: c.status === 'closed' ? 'open' : 'closed' } }); toast(c.status === 'closed' ? 'Reopened' : 'Closed'); openConv(id); loadList(); };

@@ -131,7 +131,7 @@ def footer():
 '''
 
 def chat_scripts():
-    return '<script src="js/chat-config.js" defer></script>\n<script src="js/metrics.js" defer></script>\n<script src="js/chat-kb.js" defer></script>\n<script src="js/chat.js" defer></script>\n'
+    return '<script src="js/chat-config.js" defer></script>\n<script src="js/metrics.js" defer></script>\n<script src="js/voice.js" defer></script>\n<script src="js/chat-kb.js" defer></script>\n<script src="js/chat.js" defer></script>\n'
 
 def project_html(i, p):
     flip = ' flip' if i % 2 else ''
@@ -340,6 +340,7 @@ def contact_html():
           <label for="message">Message</label>
           <textarea id="message" name="message" placeholder="What's slowing you down today?" required></textarea>
         </div>
+        <div class="field-voice" id="voice-field" hidden></div>
         <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
         <button type="submit" class="btn">Send message</button>
         <p class="form-success">Thanks — your message is on its way. Check your inbox for a confirmation.</p>
@@ -387,7 +388,7 @@ def privacy_html():
     <h2>How long we keep it</h2>
     <p>Statistics are deleted automatically after 13 months.</p>
     <h2>Contact form and chat</h2>
-    <p>If you send a message or ask to talk to the team in the chat, your message and email address go to us so we can reply. Questions the chat could not answer are saved without any personal details so we can teach it better answers.</p>
+    <p>If you send a message or ask to talk to the team in the chat, your message and email address go to us so we can reply. If you record a voice note, the recording goes to us the same way and is only used to listen and reply. Questions the chat could not answer are saved without any personal details so we can teach it better answers.</p>
     <h2>Questions</h2>
     <p>Write to <a href="mailto:everythingshul@gmail.com">everythingshul@gmail.com</a> and we will answer, or delete anything you sent us.</p>
   </div></div>
