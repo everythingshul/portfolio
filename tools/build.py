@@ -39,7 +39,7 @@ PROJECTS = [
          url='https://fundraise.everythingshul.com', shown='fundraise.everythingshul.com',
          desc='A live fundraising wall and dashboard — real-time donations displayed for the room, with full admin controls behind the scenes.',
          features=['Real-time donation wall display', 'Campaign dashboard', 'Donor & pledge tracking', 'Built-in contact & follow-up tools'],
-         shot='assets/screenshots/fundraise-full.png', alt='Fundraise Wall live donor display'),
+         video=dict(preview='assets/video/fundraise-preview.mp4', poster='assets/video/fundraise-poster.jpg', tour='assets/video/fundraise-tour.mp4')),
 ]
 
 e = html.escape
