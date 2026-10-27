@@ -20,7 +20,7 @@
         <div class="chips" id="c-status">${[['', 'All'], ['lead', 'Leads'], ['active', 'Active'], ['past', 'Past']].map(([k, l]) => `<button class="chip${state.status === k ? ' on' : ''}" data-s="${k}">${l}</button>`).join('')}</div>
         <select id="c-tag" aria-label="Filter by tag"><option value="">All tags</option></select>
         <span class="grow"></span>
-        <button class="small-btn" id="c-export">Export CSV</button>
+        <button class="small-btn" id="c-export">Export to Excel</button>
         <button class="small-btn" id="c-import">Import customers</button>
         <button class="small-btn primary" id="c-new">+ New customer</button></div>
         <div id="cust-table"><div class="aempty">Loading…</div></div>`;
@@ -30,7 +30,7 @@
       $('c-new').addEventListener('click', () => customerForm(null, (id) => open(id)));
       $('c-import').addEventListener('click', () => window.ESBilling.openImport('customers'));
       $('c-export').addEventListener('click', async () => {
-        try { const res = await fetch(api.base + '/admin/b/export?kind=customers', { headers: { Authorization: 'Bearer ' + api.token() } }); U.download('customers.csv', await res.blob()); } catch (e) { toast('Export failed'); }
+        try { const res = await fetch(api.base + '/admin/b/export?kind=customers', { headers: { Authorization: 'Bearer ' + api.token() } }); U.download('customers.xlsx', await res.blob()); } catch (e) { toast('Export failed'); }
       });
     }
     load();

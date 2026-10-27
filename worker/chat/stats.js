@@ -281,13 +281,14 @@ export async function sessionTimeline(db, sid) {
   return s ? { session: s, events: ev } : null;
 }
 
-const csvCell = (v) => { if (v == null) return ''; const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-export async function exportCsv(db, kind, from, to) {
-  const cols = kind === 'events'
+export async function exportData(db, kind, from, to) {
+  const events = kind === 'events';
+  const cols = events
     ? ['id', 'sid', 'ts', 'type', 'name', 'value', 'path', 'proj', 'extra']
     : ['sid', 'ts', 'last_ts', 'uid', 'landing', 'exit_path', 'ref_host', 'ref_url', 'utm_source', 'utm_medium', 'utm_campaign', 'channel', 'country', 'region', 'city', 'device', 'os', 'browser', 'lang', 'screen', 'pages', 'events', 'interact', 'active_s'];
-  const [rows] = await q(db, [db.prepare(`SELECT ${cols.join(',')} FROM ${kind === 'events' ? 'events' : 'sessions'} WHERE ts>=? AND ts<? ORDER BY ts LIMIT 100000`).bind(from, to)]);
-  return [cols.join(','), ...rows.map((r) => cols.map((c) => csvCell(r[c])).join(','))].join('\n');
+  const [rows] = await q(db, [db.prepare(`SELECT ${cols.join(',')} FROM ${events ? 'events' : 'sessions'} WHERE ts>=? AND ts<? ORDER BY ts LIMIT 100000`).bind(from, to)]);
+  const kinds = { ts: 'datetime', last_ts: 'datetime', pages: 'int', events: 'int', interact: 'int', active_s: 'num', id: 'int', value: 'num' };
+  return { name: events ? 'Events' : 'Visits', cols: cols.map((c) => ({ h: c, ...(kinds[c] ? { t: kinds[c] } : {}) })), rows: rows.map((r) => cols.map((c) => r[c])) };
 }
 
 export async function resetStats(db) {

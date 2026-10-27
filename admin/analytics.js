@@ -258,7 +258,7 @@
     const rangeQ = `from=${state.from}&to=${state.to}`;
     el.innerHTML =
       card('Your own visits', `<label class="check"><input type="checkbox" id="no-track" ${off ? 'checked' : ''}> Don't count my visits in this browser</label><p class="anote">Tick this on every device you use to browse the public site, so your own clicks don't skew the numbers. (The admin pages are never counted.)</p>`) +
-      card('Download your data', `<p class="anote">For the date range selected above.</p><div class="row"><button class="small-btn" data-x="sessions">Visits (CSV)</button> <button class="small-btn" data-x="events">Every event (CSV)</button></div>`) +
+      card('Download your data', `<p class="anote">For the date range selected above.</p><div class="row"><button class="small-btn" data-x="sessions">Visits (Excel)</button> <button class="small-btn" data-x="events">Every event (Excel)</button></div>`) +
       card('How it works', `<ul class="plain"><li>No cookies. A random number lives only in the browser tab and disappears when it closes.</li><li>IP addresses are never stored. Unique visitors are counted with a one-way code that changes every day.</li><li>Do Not Track and Global Privacy Control are honored. Bots and automated browsers are ignored.</li><li>Names, emails and what people type in the chat are never recorded here.</li><li>Data is kept for 13 months, then deleted automatically. A summary email arrives every Monday morning (set <code>DIGEST</code> to "off" in the Worker to stop it).</li><li>Visitors can read all this at <a href="../privacy.html" target="_blank" rel="noopener">/privacy.html</a>.</li></ul>`) +
       card('Delete everything', `<p class="anote">Removes all visits and events permanently. This cannot be undone.</p><button class="small-btn danger" id="reset-stats">Delete all analytics data</button>`);
     $('no-track').addEventListener('change', (e) => { try { e.target.checked ? localStorage.setItem('es-no-track', '1') : localStorage.removeItem('es-no-track'); } catch (x) { /* ignore */ } toast(e.target.checked ? 'Your visits on this browser will not be counted' : 'Your visits will be counted again'); });
@@ -266,7 +266,7 @@
       try {
         const res = await fetch(api.base + `/admin/stats/export?kind=${b.dataset.x}&${rangeQ}`, { headers: { Authorization: 'Bearer ' + api.token() } });
         if (!res.ok) throw new Error('Export failed');
-        const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = `everythingshul-${b.dataset.x}.csv`; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = `everythingshul-${b.dataset.x}.xlsx`; a.click();
       } catch (e) { toast(e.message); }
     }));
     $('reset-stats').addEventListener('click', async () => {

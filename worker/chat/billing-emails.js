@@ -43,7 +43,7 @@ ${summary([
 ${lineTable(d)}
 ${i.notes ? `<div style="background:${C.panel2};border-left:3px solid ${C.gold};padding:14px 16px;border-radius:4px;margin:0 0 22px;">${multiline(i.notes)}</div>` : ''}
 <p style="margin:0 0 22px;">${button(link, isQuote ? 'View and accept the quote' : 'View and pay the invoice')}</p>
-<p style="margin:0 0 24px;font-size:13px;color:${C.muted};">${isQuote ? 'You can accept or decline the quote on that page.' : 'You can pay by card or bank transfer on that page, and download a copy of the ' + word + '.'} Questions? Just reply to this email.</p>`;
+<p style="margin:0 0 24px;font-size:13px;color:${C.muted};">${isQuote ? 'You can accept or decline the quote on that page.' : 'You can pay by card or bank transfer on that page, and download a copy of the ' + word + '.'} Questions? Just reply to this email. Our <a href="${esc(siteUrl)}/terms.html" style="color:${C.goldDark};">Terms and Conditions</a> apply.</p>`;
   return shell({ siteUrl, preheader: `${i.number}: ${money(isQuote ? i.total : i.balance, cur)}`, title, content });
 }
 

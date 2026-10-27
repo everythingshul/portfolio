@@ -742,3 +742,16 @@ html.no-motion .project::before { transform: none !important; }
 .field-voice-err:empty { display: none; }
 .chat-handoff .vr-host { padding: 2px 4px; }
 @media (prefers-reduced-motion: reduce) { .vr-dot { animation: none; } .vr-wave i, .vp-btn { transition: none; } }
+
+/* terms page */
+.toc { margin: 0 0 2.4rem; padding: 18px 22px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); }
+.toc h2 { font-size: 1.1rem; margin: 0 0 8px; }
+.toc ol { margin: 0; padding-left: 1.3rem; columns: 2; column-gap: 2rem; font-size: 0.93rem; line-height: 1.9; }
+.toc a { color: var(--ink-2); } .toc a:hover { color: var(--cyan-ink); }
+.prose h2[id] { scroll-margin-top: 90px; }
+.prose p strong { color: var(--ink); font-weight: 500; }
+.form-legal { margin: 14px 0 0; font-size: 0.82rem; color: var(--ink-3); }
+.form-legal a { color: var(--cyan-ink); text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 640px) { .toc ol { columns: 1; } }
+.toc ol { list-style: decimal; padding-left: 1.7rem; }
+.toc li::marker { color: var(--ink-3); }

@@ -1,6 +1,7 @@
 // The /admin/b/* API used by the Customers and Billing tabs of /admin/. Only reached after the admin password is checked.
 import * as B from './billing.js';
 import { sendInvoice, stripeStatus } from './billing-pay.js';
+import { buildXlsx, XLSX_TYPE } from './xlsx.js';
 
 const need = (v, what) => { if (!v) throw B.fail(`Missing ${what}`); return v; };
 
@@ -29,7 +30,8 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
         case 'search': return json(await B.search(env, q.q), 200, h);
         case 'export': {
           const kind = ['customers', 'payments'].includes(q.kind) ? q.kind : 'invoices';
-          return new Response(await B.exportCsv(env, kind, q.from, q.to), { status: 200, headers: { ...h, 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' } });
+          const sheet = await B.exportData(env, kind, q.from, q.to);
+          return new Response(buildXlsx([sheet]), { status: 200, headers: { ...h, 'Content-Type': XLSX_TYPE, 'Content-Disposition': `attachment; filename="${kind}.xlsx"`, 'Cache-Control': 'no-store' } });
         }
         default: return json({ error: 'Not found' }, 404, h);
       }

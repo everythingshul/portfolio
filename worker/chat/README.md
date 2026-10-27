@@ -96,3 +96,5 @@ so contact form messages and chat handoffs become leads).
   Webhooks are signature-checked and idempotent (the Stripe payment intent id is unique in `payments`).
 - The daily cron (05:30 UTC) creates due repeating invoices and sends payment reminders (3 days before, on the due date, then 7, 14, 30 days late).
 - Wix import: Billing -> Import takes CSV exports of contacts and invoices, matches columns automatically, and can be re-run safely.
+
+Exports are Excel (.xlsx) files made by `xlsx.js`, so Hebrew text opens correctly. Imports read CSV.

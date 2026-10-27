@@ -79,7 +79,7 @@
       : [['', 'All'], ['draft', 'Draft'], ['unpaid', 'Unpaid'], ['overdue', 'Overdue'], ['paid', 'Paid'], ['void', 'Void']];
     el.innerHTML = `<div class="toolbar"><input type="search" id="l-q" placeholder="Search number or customer…" value="${esc(q.q)}"><div class="chips" id="l-chips">${chips.map(([k, l]) => `<button class="chip${q.status === k ? ' on' : ''}" data-s="${k}">${l}</button>`).join('')}</div>
       ${kind === 'invoice' ? `<input type="date" id="l-from" value="${esc(q.from)}" aria-label="From"><span class="subtle">to</span><input type="date" id="l-to" value="${esc(q.to)}" aria-label="To">` : ''}
-      <span class="grow"></span>${kind === 'invoice' ? '<button class="small-btn" id="l-export">Export CSV</button>' : ''}<button class="small-btn primary" id="l-new">+ New ${kind}</button></div><div id="l-body"><div class="aempty">Loading…</div></div>`;
+      <span class="grow"></span>${kind === 'invoice' ? '<button class="small-btn" id="l-export">Export to Excel</button>' : ''}<button class="small-btn primary" id="l-new">+ New ${kind}</button></div><div id="l-body"><div class="aempty">Loading…</div></div>`;
     $('l-new').addEventListener('click', () => invoiceEditor({ kind }));
     const reload = U.debounce(() => { q.q = $('l-q').value.trim(); if ($('l-from')) { q.from = $('l-from').value; q.to = $('l-to').value; } fetchList(); }, 250);
     $('l-q').addEventListener('input', reload);
@@ -103,7 +103,7 @@
     try {
       const res = await fetch(api.base + `/admin/b/export?${new URLSearchParams({ kind, from: from || '', to: to || '' })}`, { headers: { Authorization: 'Bearer ' + api.token() } });
       if (!res.ok) throw new Error('Export failed');
-      U.download(`${kind}.csv`, await res.blob());
+      U.download(`${kind}.xlsx`, await res.blob());
     } catch (e) { toast(e.message); }
   }
 
@@ -360,7 +360,7 @@
   VIEW.payments = async (el) => {
     const q = st.pay;
     el.innerHTML = `<div class="toolbar"><input type="search" id="p-q" placeholder="Search customer or invoice…" value="${esc(q.q)}"><input type="date" id="p-from" value="${esc(q.from)}" aria-label="From"><span class="subtle">to</span><input type="date" id="p-to" value="${esc(q.to)}" aria-label="To">
-      <select id="p-m"><option value="">All methods</option>${METHODS.map(([k, l]) => `<option value="${k}"${q.method === k ? ' selected' : ''}>${l}</option>`).join('')}</select><span class="grow"></span><button class="small-btn" id="p-export">Export CSV</button></div><div id="p-body"></div>`;
+      <select id="p-m"><option value="">All methods</option>${METHODS.map(([k, l]) => `<option value="${k}"${q.method === k ? ' selected' : ''}>${l}</option>`).join('')}</select><span class="grow"></span><button class="small-btn" id="p-export">Export to Excel</button></div><div id="p-body"></div>`;
     const fetchIt = async () => {
       q.q = $('p-q').value.trim(); q.from = $('p-from').value; q.to = $('p-to').value; q.method = $('p-m').value;
       const d = await api('/admin/b/payments?' + new URLSearchParams(q));
@@ -396,7 +396,7 @@
   VIEW.reports = async (el) => {
     const q = st.rep;
     const d = await api('/admin/b/reports?' + new URLSearchParams(q));
-    el.innerHTML = `<div class="toolbar"><label class="subtle">From <input type="date" id="rp-from" value="${esc(d.from)}"></label><label class="subtle">To <input type="date" id="rp-to" value="${esc(d.to)}"></label><button class="small-btn" id="rp-go">Update</button><span class="grow"></span><button class="small-btn" id="rp-ex1">Invoices CSV</button><button class="small-btn" id="rp-ex2">Payments CSV</button><button class="small-btn" id="rp-ex3">Customers CSV</button></div>
+    el.innerHTML = `<div class="toolbar"><label class="subtle">From <input type="date" id="rp-from" value="${esc(d.from)}"></label><label class="subtle">To <input type="date" id="rp-to" value="${esc(d.to)}"></label><button class="small-btn" id="rp-go">Update</button><span class="grow"></span><button class="small-btn" id="rp-ex1">Invoices (Excel)</button><button class="small-btn" id="rp-ex2">Payments (Excel)</button><button class="small-btn" id="rp-ex3">Customers (Excel)</button></div>
       <div class="kpis">${kpi('Invoiced', esc(money(d.invoiced.s)), `${d.invoiced.n} invoice${d.invoiced.n === 1 ? '' : 's'}`)}${kpi('Received', esc(money(d.byMonth.reduce((a, m) => a + m.received, 0))), '', 'good')}${kpi('Refunded', esc(money(d.byMonth.reduce((a, m) => a + m.refunded, 0))))}${kpi('Net income', esc(money(d.byMonth.reduce((a, m) => a + m.net, 0))))}${kpi('Tax charged', esc(money(d.tax)), 'on invoices issued in this period')}</div>
       <div class="grid2">${card('By month', table(['Month', '>Received', '>Refunded', '>Net'], d.byMonth.map((m) => `<tr><td>${esc(new Date(m.m + '-15').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))}</td><td class="n">${esc(money(m.received))}</td><td class="n">${m.refunded ? esc(money(m.refunded)) : '—'}</td><td class="n"><strong>${esc(money(m.net))}</strong></td></tr>`)))}
         ${card('By payment method', bars(d.byMethod, (r) => methodName(r.method), (r) => r.s, (v) => money(v)))}</div>

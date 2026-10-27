@@ -21,7 +21,8 @@ import { brevo } from './mail.js';
 import { upsertLead } from './billing.js';
 import { billingAdmin } from './billing-admin.js';
 import { publicInvoice, respondToQuote, createCheckout, stripeWebhook, billingDaily } from './billing-pay.js';
-import { ingest, computeStats, liveStats, recentSessions, sessionTimeline, exportCsv, resetStats, purgeOld } from './stats.js';
+import { buildXlsx, XLSX_TYPE } from './xlsx.js';
+import { ingest, computeStats, liveStats, recentSessions, sessionTimeline, exportData, resetStats, purgeOld } from './stats.js';
 
 const MAX_TEXT = 1500;
 const MAX_MESSAGES = 300;
@@ -366,8 +367,9 @@ async function admin(request, url, env, h) {
       return t ? json(t, 200, h) : json({ error: 'Not found' }, 404, h);
     }
     if (path === '/admin/stats/export') {
-      const csv = await exportCsv(env.STATS, sp.get('kind') === 'events' ? 'events' : 'sessions', from, to);
-      return new Response(csv, { status: 200, headers: { ...h, 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' } });
+      const kind = sp.get('kind') === 'events' ? 'events' : 'sessions';
+      const sheet = await exportData(env.STATS, kind, from, to);
+      return new Response(buildXlsx([sheet]), { status: 200, headers: { ...h, 'Content-Type': XLSX_TYPE, 'Content-Disposition': `attachment; filename="${kind}.xlsx"`, 'Cache-Control': 'no-store' } });
     }
     if (path === '/admin/stats/reset' && request.method === 'POST') { await resetStats(env.STATS); return json({ ok: true }, 200, h); }
     return json({ error: 'Not found' }, 404, h);

@@ -60,3 +60,4 @@
   .inv-doc { box-shadow: none; border-radius: 0; padding: 0; max-width: none; }
   @page { margin: 16mm; }
 }
+.inv-legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
