@@ -41,17 +41,26 @@
   }
 
   /* ------------------------------------------------------------------ tabs */
-  function setTab(name) {
+  const PAGE_HASH = /^#(teach|analytics|customers|billing|customer=|invoice=)/;
+  // quiet = just switch the visible tab; the caller fills it in (used by the Customers and Billing screens themselves)
+  function setTab(name, quiet) {
     tab = name;
     document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
     $('layout').hidden = name !== 'chats';
     $('teach').hidden = name !== 'teach';
-    $('analytics').hidden = name !== 'analytics';
+    ['analytics', 'customers', 'billing'].forEach((k) => { $(k).hidden = name !== k; });
     if (window.ESAnalytics && name !== 'analytics') window.ESAnalytics.hide();
+    if (quiet) return;
     if (name === 'teach') { history.replaceState(null, '', '#teach'); loadTeach(); }
     else if (name === 'analytics') { history.replaceState(null, '', '#analytics'); window.ESAnalytics.show(api, API, () => token); }
-    else if (location.hash === '#teach' || location.hash === '#analytics') history.replaceState(null, '', location.pathname);
+    else if (name === 'customers') { history.replaceState(null, '', '#customers'); window.ESCRM.show(api); }
+    else if (name === 'billing') { history.replaceState(null, '', '#billing'); window.ESBilling.show(api); }
+    else if (PAGE_HASH.test(location.hash)) history.replaceState(null, '', location.pathname);
   }
+  api.base = API; api.token = () => token;
+  if (window.ESBilling) window.ESBilling.setApi(api);
+  if (window.ESCRM) window.ESCRM.setApi(api);
+  window.ESAdmin = { setTab, openChat: (id) => { setTab('chats'); openConv(id); } };
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
 
   /* ------------------------------------------------------------------ chats */
@@ -203,6 +212,9 @@
       const h = location.hash.slice(1);
       if (h === 'teach') setTab('teach');
       else if (h === 'analytics') setTab('analytics');
+      else if (h === 'customers' || h.startsWith('customer=')) setTab('customers');
+      else if (h === 'billing') setTab('billing');
+      else if (h.startsWith('invoice=')) { setTab('billing', true); window.ESBilling.setApi(api); window.ESBilling.openInvoice(h.slice(8)); }
       else if (h && !$('app').hidden) openConv(h);
     });
     clearInterval(timer);

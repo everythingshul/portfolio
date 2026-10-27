@@ -27,7 +27,14 @@ binding = "STATS"
 database_name = "everythingshul-stats"
 database_id = "78745e90-b210-4a7c-96da-a00c2178681c"
 
-# Daily cleanup of old analytics data and the Monday morning summary email.
+# Customers, invoices and payments (Cloudflare D1). tools/deploy-workers.sh creates it and fills in the id.
+# Secrets for online payments (typed into Cloudflare, never committed): STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET.
+[[d1_databases]]
+binding = "BILL"
+database_name = "everythingshul-billing"
+database_id = "PASTE_BILLING_D1_ID_HERE"
+
+# Daily: cleanup of old analytics, recurring invoices and payment reminders. Monday morning: the website summary email.
 [triggers]
 crons = ["30 5 * * *", "0 13 * * 1"]
 

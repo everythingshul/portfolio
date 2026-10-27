@@ -1,6 +1,7 @@
 // Cloudflare Worker: receives the contact form and sends two emails through Brevo
 // (a notification to us and a confirmation to the visitor).
 import { notificationEmail, confirmationEmail } from './emails.js';
+import { upsertLead } from './chat/billing.js';
 
 const LIMITS = { name: 120, email: 200, org: 200, interest: 120, message: 5000 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,6 +83,11 @@ export default {
       console.error(e.message);
       return json({ error: 'Could not send your message right now.' }, 502, headers);
     }
+    // Add the person to the customer list as a lead (best effort: the inquiry already reached us).
+    try {
+      await upsertLead(env, { name: clean.name, email: clean.email, org: clean.org, source: 'contact form',
+        text: `Contact form${clean.interest ? ' (' + clean.interest + ')' : ''}: "${(clean.message || 'voice note').slice(0, 200)}"` });
+    } catch (e) { console.error('lead', e.message); }
     return json({ ok: true }, 200, headers);
   },
 };

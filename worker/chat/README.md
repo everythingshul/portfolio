@@ -79,3 +79,20 @@ The Worker stores anonymous site statistics in a D1 database bound as `STATS`.
 Vars: `DIGEST` ("off" disables the Monday email), `RETENTION_DAYS` (default 395). Optional secret `STATS_SALT`
 (otherwise `ADMIN_TOKEN` salts the daily visitor hash). Cron: daily purge and Monday digest. View everything in
 /admin/ under Analytics.
+
+
+## Customers, invoices and Stripe
+
+`/admin/` has Customers (CRM) and Billing tabs. Data lives in a second D1 database bound as `BILL`
+(`schema`: `billing.sql`; created and filled in by `tools/deploy-workers.sh`, which also gives the contact Worker the same binding
+so contact form messages and chat handoffs become leads).
+
+- Code: `billing.js` (data and rules), `billing-admin.js` (the `/admin/b/*` API), `billing-pay.js` (sending, the customer's invoice page,
+  Stripe Checkout and webhook, daily reminders and repeating invoices), `billing-emails.js`.
+- Customers open `https://<site>/pay/?t=<secret token>`; the page calls `GET /i`, `POST /i/pay`, `POST /i/respond`.
+- Online payment: Stripe Checkout (cards and, if enabled in the Stripe dashboard, bank transfer). Secrets, typed into Cloudflare:
+  `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Webhook endpoint: `https://<chat worker>/stripe/webhook`, events
+  `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `charge.refunded`.
+  Webhooks are signature-checked and idempotent (the Stripe payment intent id is unique in `payments`).
+- The daily cron (05:30 UTC) creates due repeating invoices and sends payment reminders (3 days before, on the due date, then 7, 14, 30 days late).
+- Wix import: Billing -> Import takes CSV exports of contacts and invoices, matches columns automatically, and can be re-run safely.

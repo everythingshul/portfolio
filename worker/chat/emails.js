@@ -1,15 +1,15 @@
 // Email templates for the chat handoff. Same look as the contact-form emails
 // (dark brown header, white card on cream, gold accents, Georgia headings).
-const C = {
+export const C = {
   bg: '#f3ede2', panel: '#ffffff', panel2: '#f7f2e8', dark: '#241a15', body: '#3a2e24',
   muted: '#8a7c63', border: '#e5dcc8', gold: '#c9a76a', goldDark: '#a9773f',
 };
 
 export const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const multiline = (s) => esc(s).replace(/\r?\n/g, '<br>');
+export const multiline = (s) => esc(s).replace(/\r?\n/g, '<br>');
 
-function shell({ siteUrl, preheader, title, content }) {
+export function shell({ siteUrl, preheader, title, content }) {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title></head>
@@ -30,11 +30,11 @@ Everything Shul &middot; <a href="${esc(siteUrl)}" style="color:${C.goldDark};">
 </table></td></tr></table></body></html>`;
 }
 
-const heading = (t) =>
+export const heading = (t) =>
   `<h1 style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:${C.dark};font-weight:normal;">${esc(t)}</h1>`;
-const quote = (t) =>
+export const quote = (t) =>
   `<div style="background:${C.panel2};border-left:3px solid ${C.gold};padding:14px 16px;border-radius:4px;margin:0 0 22px;">${multiline(t)}</div>`;
-const button = (href, label) =>
+export const button = (href, label) =>
   `<a href="${esc(href)}" style="display:inline-block;background:${C.goldDark};color:#ffffff;text-decoration:none;padding:11px 22px;border-radius:6px;font-weight:600;font-size:14px;">${esc(label)}</a>`;
 
 // To the team: a visitor asked for a person, or sent another message.
