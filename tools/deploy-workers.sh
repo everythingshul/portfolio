@@ -9,6 +9,7 @@
 # (Workers & Pages -> the Worker -> Settings -> Variables and Secrets -> Add, type "Secret"):
 #   everythingshul-contact:  BREVO_API_KEY
 #   everythingshul-chat:     BREVO_API_KEY and ADMIN_TOKEN  (ADMIN_TOKEN = the /admin/ password)
+#                            and, for online invoice payments, STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
 #
 # Safe to re-run. Add --send-test you@example.com to send one real test email through Brevo afterwards.
 set -euo pipefail
@@ -51,35 +52,46 @@ s = re.sub(r'(binding = "CHAT"\nid = )"[^"]*"', r'\1"%s"' % sys.argv[1], s)
 open(p, 'w').write(s)
 PY
 
-echo "3b/5 Analytics storage (D1)..."
-# Needs the token to have "D1: Edit". Without it, analytics stays off and the rest still deploys.
-D1_ID=$(cf "$API/d1/database?name=everythingshul-stats" | pj "
+echo "3b/5 Databases (D1)..."
+# Needs the token to have "D1: Edit". Without it, a Worker that needs a database is skipped instead of being deployed broken.
+d1_id() {   # prints the id of database $1, creating it if needed; prints DENIED if the token may not use D1
+  local id
+  id=$(cf "$API/d1/database?name=$1" | pj "
 assert d.get('success'), 'D1 not allowed: ' + str(d.get('errors'))
-print(next((x['uuid'] for x in d.get('result', []) if x['name']=='everythingshul-stats'), ''))" 2>/dev/null || echo "DENIED")
-if [ "$D1_ID" = "DENIED" ]; then
-  echo "   !! The token cannot use D1. Add the permission Account > D1 > Edit to the token and re-run."
-  echo "   !! Skipping the chat Worker deploy so the placeholder database id does not break it."
-  SKIP_CHAT=1
-else
-  if [ -z "$D1_ID" ]; then
-    D1_ID=$(cf -X POST "$API/d1/database" -d '{"name":"everythingshul-stats"}' | pj "assert d.get('success'), d.get('errors'); print(d['result']['uuid'])")
-    echo "   created database"
-  else
-    echo "   found existing database"
+print(next((x['uuid'] for x in d.get('result', []) if x['name']=='$1'), ''))" 2>/dev/null || echo "DENIED")
+  if [ "$id" = "" ]; then
+    id=$(cf -X POST "$API/d1/database" -d "{\"name\":\"$1\"}" | pj "assert d.get('success'), d.get('errors'); print(d['result']['uuid'])" 2>/dev/null || echo "DENIED")
   fi
-  python3 - "$D1_ID" <<'PY'
+  echo "$id"
+}
+patch_id() {   # file, binding, id
+  python3 - "$1" "$2" "$3" <<'PY'
 import re, sys
-p = 'worker/chat/wrangler.toml'
+p, binding, dbid = sys.argv[1:4]
 s = open(p).read()
-s = re.sub(r'(database_id = )"[^"]*"', r'\1"%s"' % sys.argv[1], s)
+s = re.sub(r'(binding = "%s"\ndatabase_name = "[^"]*"\ndatabase_id = )"[^"]*"' % binding, r'\1"%s"' % dbid, s)
 open(p, 'w').write(s)
 PY
+}
+STATS_ID=$(d1_id everythingshul-stats)
+BILL_ID=$(d1_id everythingshul-billing)
+SKIP_CHAT=0; SKIP_CONTACT=0
+if [ "$STATS_ID" = "DENIED" ] || [ "$BILL_ID" = "DENIED" ]; then
+  echo "   !! The token cannot use D1. Add the permission Account > D1 > Edit to the token and re-run."
+  echo "   !! Skipping the Workers that need a database so a placeholder id does not break them."
+  SKIP_CHAT=1; SKIP_CONTACT=1
+else
+  patch_id worker/chat/wrangler.toml STATS "$STATS_ID"
+  patch_id worker/chat/wrangler.toml BILL "$BILL_ID"
+  patch_id worker/wrangler.toml BILL "$BILL_ID"
   (cd worker/chat && $WR d1 execute everythingshul-stats --remote --file=schema.sql 2>&1 | grep -E "Executed|error|Error" || true)
+  (cd worker/chat && $WR d1 execute everythingshul-billing --remote --file=billing.sql 2>&1 | grep -E "Executed|error|Error" || true)
 fi
 
 echo "4/5 Deploying the Workers..."
 for d in worker worker/chat; do
-  if [ "$d" = "worker/chat" ] && [ "${SKIP_CHAT:-0}" = "1" ]; then echo "   -> $d skipped"; continue; fi
+  if [ "$d" = "worker/chat" ] && [ "$SKIP_CHAT" = "1" ]; then echo "   -> $d skipped"; continue; fi
+  if [ "$d" = "worker" ] && [ "$SKIP_CONTACT" = "1" ]; then echo "   -> $d skipped"; continue; fi
   echo "   -> $d"
   (cd "$d" && $WR deploy 2>&1 | grep -E "Deployed|https://|Error|error" || true)
 done

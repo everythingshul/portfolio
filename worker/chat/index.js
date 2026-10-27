@@ -8,12 +8,19 @@
 //     GET  /learned  answers the team has taught Chesky (public, read-only)
 //     POST /log      anonymous "I couldn't answer this" / thumbs up / thumbs down events
 //     POST /t        site analytics events (see stats.js)
+//     GET  /i?t=     the customer's invoice or quote page (billing-pay.js); POST /i/pay, POST /i/respond
+//     POST /stripe/webhook   Stripe tells us a payment went through (signature checked)
 //   Admin side (Bearer ADMIN_TOKEN; used by /admin/ on the site):
 //     GET  /admin/list, GET /admin/conv, POST /admin/reply, POST /admin/status, POST /admin/delete
 //     GET  /admin/learn, POST /admin/teach, POST /admin/forget, POST /admin/dismiss   (teaching Chesky)
+//     /admin/b/*      customers (CRM), invoices, quotes, payments, reports (billing-admin.js)
 //
 // Conversations live in the CHAT KV namespace. Email goes out through Brevo.
 import { adminNotification, customerConfirmation, customerReply, digestEmail } from './emails.js';
+import { brevo } from './mail.js';
+import { upsertLead } from './billing.js';
+import { billingAdmin } from './billing-admin.js';
+import { publicInvoice, respondToQuote, createCheckout, stripeWebhook, billingDaily } from './billing-pay.js';
 import { ingest, computeStats, liveStats, recentSessions, sessionTimeline, exportCsv, resetStats, purgeOld } from './stats.js';
 
 const MAX_TEXT = 1500;
@@ -109,14 +116,6 @@ async function dropConv(env, id) {
 }
 
 /* ------------------------------------------------------------------ email */
-async function brevo(env, payload) {
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ sender: { name: env.SENDER_NAME, email: env.SENDER_EMAIL }, ...payload }),
-  });
-  if (!res.ok) throw new Error(`Brevo ${res.status}: ${await res.text()}`);
-}
 
 const adminLink = (env, id) => `${env.SITE_URL}/admin/#${id}`;
 const chatLink = (env, id) => `${env.SITE_URL}/#chat=${id}`;
@@ -247,6 +246,7 @@ async function handoff(request, env, h) {
     messages: [...earlier, ...(message ? [{ from: 'customer', text: message, ts: now }] : []), ...(voice ? [{ from: 'customer', ...voice.message, ts: now }] : [])],
   };
   await putConv(env, conv);
+  try { await upsertLead(env, { name: conv.name, email: conv.email, source: 'chat', text: `Started a chat: "${(message || 'voice note').slice(0, 160)}"` }); } catch (e) { console.error('lead', e.message); }
 
   const out = { ok: true };
   const mailText = [message, voice && `🎤 ${voice.message.text}${voice.attachment ? ' is attached to this email' : ''}. You can also play it in the admin page.`].filter(Boolean).join('\n\n');
@@ -301,6 +301,29 @@ async function poll(url, env, h) {
   }, 200, h);
 }
 
+/* ------------------------------------------------------------------ customer invoice pages */
+async function invoicePage(request, url, env, h) {
+  if (!env.BILL) return json({ error: 'Not found' }, 404, h);
+  if (await limited(env, request, 'inv', 200)) return json({ error: 'Too many requests.' }, 429, h);
+  const inv = await publicInvoice(env, url.searchParams.get('t') || '');
+  return inv ? json(inv, 200, h) : json({ error: 'This link is not valid.' }, 404, h);
+}
+async function invoicePay(request, env, h) {
+  if (!env.BILL) return json({ error: 'Not found' }, 404, h);
+  if (await limited(env, request, 'pay', 30)) return json({ error: 'Too many attempts. Please try again later.' }, 429, h);
+  let b; try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
+  try { return json(await createCheckout(env, String(b.t || '')), 200, h); }
+  catch (e) { return json({ error: e.status ? e.message : 'Online payment is not available right now. Please contact us.' }, e.status || 500, h); }
+}
+async function invoiceRespond(request, env, h) {
+  if (!env.BILL) return json({ error: 'Not found' }, 404, h);
+  if (await limited(env, request, 'qresp', 20)) return json({ error: 'Too many attempts.' }, 429, h);
+  let b; try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
+  if (!['accept', 'decline'].includes(b.action)) return json({ error: 'Invalid request' }, 400, h);
+  try { return json(await respondToQuote(env, String(b.t || ''), b.action), 200, h); }
+  catch (e) { return json({ error: e.status ? e.message : 'Something went wrong.' }, e.status || 500, h); }
+}
+
 /* ------------------------------------------------------------------ admin */
 async function admin(request, url, env, h) {
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
@@ -315,6 +338,15 @@ async function admin(request, url, env, h) {
     if (!conv) return json({ error: 'Not found' }, 404, h);
     if (conv.unread) { conv.unread = false; await putConv(env, conv, false); }
     return json(conv, 200, h);
+  }
+
+  if (path.startsWith('/admin/b/')) {
+    const chatsFor = async (email) => {
+      if (!email) return [];
+      const idx = (await env.CHAT.get('idx', 'json')) || [];
+      return idx.filter((c) => (c.email || '').toLowerCase() === email.toLowerCase()).slice(0, 10);
+    };
+    return billingAdmin(request, url, env, h, json, chatsFor);
   }
 
   if (path.startsWith('/admin/stats')) {
@@ -423,10 +455,12 @@ async function sendDigest(env) {
 
 export default {
   async scheduled(event, env) {
-    if (!env.STATS) return;
     try {
-      if (event.cron === '0 13 * * 1') { if ((env.DIGEST || 'on') !== 'off') await sendDigest(env); }
-      else await purgeOld(env.STATS, env);
+      if (event.cron === '0 13 * * 1') { if (env.STATS && (env.DIGEST || 'on') !== 'off') await sendDigest(env); }
+      else {
+        if (env.STATS) await purgeOld(env.STATS, env);
+        if (env.BILL) console.log('billing daily', JSON.stringify(await billingDaily(env)));
+      }
     } catch (e) { console.error('scheduled', event.cron, e && e.message); }
   },
 
@@ -437,6 +471,8 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: h });
     // <audio> tags send no Origin header; the unguessable id in the link is what protects a voice note.
     if (url.pathname === '/voice' && request.method === 'GET') return await voiceFile(url, env);
+    // Stripe calls this itself (no Origin); the signature is what proves it is Stripe.
+    if (url.pathname === '/stripe/webhook' && request.method === 'POST') return await stripeWebhook(request, env);
     if (!origins(env).includes(origin)) return json({ error: 'Forbidden' }, 403, h);
 
     try {
@@ -447,6 +483,9 @@ export default {
       if (url.pathname === '/learned' && request.method === 'GET') return await learnedPublic(env, h);
       if (url.pathname === '/log' && request.method === 'POST') return await logEvent(request, env, h);
       if (url.pathname === '/t' && request.method === 'POST') return await ingest(request, env, h);
+      if (url.pathname === '/i' && request.method === 'GET') return await invoicePage(request, url, env, h);
+      if (url.pathname === '/i/pay' && request.method === 'POST') return await invoicePay(request, env, h);
+      if (url.pathname === '/i/respond' && request.method === 'POST') return await invoiceRespond(request, env, h);
       return json({ error: 'Not found' }, 404, h);
     } catch (err) {
       console.error('chat worker error', err && err.message);

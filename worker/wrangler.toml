@@ -11,3 +11,10 @@ ALLOWED_ORIGINS = "https://everythingshul.com,https://www.everythingshul.com"
 SITE_URL = "https://everythingshul.com"
 
 # Secret (never committed): wrangler secret put BREVO_API_KEY
+
+# Customer list and billing database (Cloudflare D1), shared with the chat Worker so contact form messages become leads.
+# tools/deploy-workers.sh creates it and fills in the id.
+[[d1_databases]]
+binding = "BILL"
+database_name = "everythingshul-billing"
+database_id = "14638454-5742-4071-9f47-9c841851bd04"
