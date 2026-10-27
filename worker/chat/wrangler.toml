@@ -32,7 +32,7 @@ database_id = "78745e90-b210-4a7c-96da-a00c2178681c"
 [[d1_databases]]
 binding = "BILL"
 database_name = "everythingshul-billing"
-database_id = "PASTE_BILLING_D1_ID_HERE"
+database_id = "14638454-5742-4071-9f47-9c841851bd04"
 
 # Daily: cleanup of old analytics, recurring invoices and payment reminders. Monday morning: the website summary email.
 [triggers]

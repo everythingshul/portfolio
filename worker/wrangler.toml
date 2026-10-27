@@ -17,4 +17,4 @@ SITE_URL = "https://everythingshul.com"
 [[d1_databases]]
 binding = "BILL"
 database_name = "everythingshul-billing"
-database_id = "PASTE_BILLING_D1_ID_HERE"
+database_id = "14638454-5742-4071-9f47-9c841851bd04"
