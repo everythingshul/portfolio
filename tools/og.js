@@ -13,7 +13,7 @@ const projects = [
   { id: 'kupeshair', name: 'Kupes Hair Williamsburg', kind: 'Gift card assistance platform', shown: 'kupeshair.org', img: 'assets/video/kupeshair-poster.jpg', pos: 'center' },
   { id: 'jlistings', name: 'JListings', kind: 'Organization classifieds', shown: 'jlistings.com', img: 'assets/screenshots/jlistings-full.png', pos: 'top' },
   { id: 'mamudem', name: 'Mamudem', kind: 'Event ticketing', shown: 'mamudem.com', img: 'assets/video/mamudem-poster.jpg', pos: 'center' },
-  { id: 'fundraise', name: 'Fundraise Wall', kind: 'Live fundraising', shown: 'fundraise.everythingshul.com', img: 'assets/screenshots/fundraise-full.png', pos: 'top' },
+  { id: 'fundraise', name: 'Fundraise Wall', kind: 'Live fundraising', shown: 'fundraise.everythingshul.com', img: 'assets/video/fundraise-poster.jpg', pos: 'center' },
 ];
 
 const css = `

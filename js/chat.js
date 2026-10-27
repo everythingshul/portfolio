@@ -429,7 +429,7 @@
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
   try { state.history = JSON.parse(ssGet(STORE) || '[]'); } catch (e) { state.history = []; }
-  const save = () => { if (!human) ssSet(STORE, JSON.stringify(state.history.filter((m) => !m.form).slice(-30))); };
+  const save = () => { if (!human) ssSet(STORE, JSON.stringify(state.history.filter((m) => !m.form && !m.voice).slice(-30))); };
 
   /* ====================================================================== DOM */
   const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
@@ -458,13 +458,22 @@
     '<button type="button" class="chat-x" aria-label="Close chat">×</button></header>' +
     '<div class="chat-log" aria-live="polite"></div>' +
     '<div class="chat-chips"></div>' +
-    '<form class="chat-form"><input type="text" maxlength="500" placeholder="Type your question…" aria-label="Your message" autocomplete="off"><button type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>';
+    '<form class="chat-form"><input type="text" maxlength="500" placeholder="Type your question…" aria-label="Your message" autocomplete="off" enterkeyhint="send">' +
+    '<button type="button" class="chat-mic" aria-label="Record a voice note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>' +
+    '<button type="submit" class="chat-sendbtn" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>' +
+    '<div class="chat-rec"></div></form>';
   document.body.append(panel, nudge, fab);
 
   const log = panel.querySelector('.chat-log');
   const chipsBox = panel.querySelector('.chat-chips');
   const form = panel.querySelector('.chat-form');
   const input = form.querySelector('input');
+  const mic = form.querySelector('.chat-mic');
+  const recHost = form.querySelector('.chat-rec');
+  const Voice = window.ESVoice;
+  const canVoice = !!(Voice && Voice.supported);
+  form.classList.toggle('no-voice', !canVoice);
+  input.addEventListener('input', () => form.classList.toggle('has-text', !!input.value.trim()));
   const headName = panel.querySelector('.chat-head strong');
   const headSub = panel.querySelector('.chat-head em');
   const headImg = panel.querySelector('.chat-head img');
@@ -498,7 +507,9 @@
       row.appendChild(el('div', 'chat-sys', esc(m.text)));
       log.appendChild(row); scroll(); return row;
     }
-    const bubble = el('div', 'chat-bubble', role === 'user' ? esc(m.text) : autolink(m.text));
+    const bubble = m.voice ? el('div', 'chat-bubble voice') : el('div', 'chat-bubble', role === 'user' ? esc(m.text) : autolink(m.text));
+    if (m.voice && Voice) bubble.appendChild(Voice.player({ url: m.voice.url || `${ENDPOINT}/voice?id=${encodeURIComponent(m.voice.id || '')}`, dur: m.voice.dur, peaks: m.voice.peaks }));
+    else if (m.voice) bubble.textContent = m.text;
     let body = row;
     if (role !== 'user') {
       const av = el('img', 'chat-av');
@@ -559,11 +570,11 @@
   /* ====================================================================== handoff form */
   const validEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
-  const transcript = () => state.history.filter((m) => !m.form && m.text).slice(-14)
+  const transcript = () => state.history.filter((m) => !m.form && !m.voice && m.text).slice(-14)
     .map((m) => ({ role: m.role === 'user' ? 'customer' : 'bot', text: m.text }));
 
   function addForm(m) {
-    const lastQ = [...state.history].reverse().find((x) => x.role === 'user');
+    const lastQ = [...state.history].reverse().find((x) => x.role === 'user' && !x.voice);
     const row = el('div', 'chat-msg bot pop formrow');
     row.appendChild(Object.assign(el('img', 'chat-av'), { src: AVATAR, alt: '' }));
     const body = el('div', 'chat-body');
@@ -572,11 +583,41 @@
     f.innerHTML =
       '<label>Your email<input type="email" name="email" required maxlength="200" autocomplete="email" placeholder="you@example.com"></label>' +
       '<label>Your name <small>(optional)</small><input type="text" name="name" maxlength="120" autocomplete="name"></label>' +
-      '<label>What would you like to ask?<textarea name="message" required maxlength="1500" rows="2" placeholder="Tell the team what you need"></textarea></label>' +
+      '<label>What would you like to ask? <small class="chat-opt" hidden>(optional with a voice note)</small><textarea name="message" maxlength="1500" rows="2" placeholder="Tell the team what you need"></textarea></label>' +
+      '<div class="chat-vslot"></div>' +
       '<p class="chat-form-note">The team replies here in the chat and to your email.</p>' +
       '<p class="chat-form-err" role="alert"></p>' +
       '<div class="chat-form-actions"><button type="submit" class="chat-send">Send to the team</button><button type="button" class="chat-cancel">Cancel</button></div>';
     f.elements.message.value = lastQ ? lastQ.text : '';
+    let clip = m.voice || null;      // a voice note recorded before the form opened, or added in it
+    let fromLog = !!m.voice;         // true when its bubble is already in the chat log
+    const slot = f.querySelector('.chat-vslot');
+    const opt = f.querySelector('.chat-opt');
+    const renderSlot = () => {
+      slot.innerHTML = '';
+      opt.hidden = !clip;
+      if (clip) {
+        const box = el('div', 'vclip');
+        box.appendChild(Voice.player(clip));
+        const x = el('button', 'vclip-x', 'Remove'); x.type = 'button';
+        x.addEventListener('click', () => { clip = null; fromLog = false; renderSlot(); });
+        box.appendChild(x); slot.appendChild(box);
+      } else if (canVoice) {
+        const b = el('button', 'chat-voicebtn', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Add a voice note');
+        b.type = 'button';
+        b.addEventListener('click', () => {
+          b.remove();
+          const host = el('div', 'vr-host on'); slot.appendChild(host);
+          Voice.recorderBar(host, { done: true, sendLabel: 'Attach voice note',
+            onSend: (c) => { clip = c; renderSlot(); },
+            onCancel: () => renderSlot(),
+            onError: (msg) => { renderSlot(); err.textContent = msg; } });
+        });
+        slot.appendChild(b);
+      }
+    };
+    const err = f.querySelector('.chat-form-err');
+    renderSlot();
     f.elements.email.value = lsGet('es-chat-email') || '';
     body.appendChild(f);
     row.appendChild(body);
@@ -593,13 +634,12 @@
 
     f.addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const err = f.querySelector('.chat-form-err');
       err.textContent = '';
       const email = f.elements.email.value.trim();
       const message = f.elements.message.value.trim();
       const name = f.elements.name.value.trim();
       if (!validEmail(email)) { err.textContent = 'Please enter a valid email so the team can reply.'; return; }
-      if (!message) { err.textContent = 'Please add a short message.'; return; }
+      if (!message && !clip) { err.textContent = 'Please add a short message or a voice note.'; return; }
       const btn = f.querySelector('.chat-send');
       btn.disabled = true; btn.textContent = 'Sending…';
       lsSet('es-chat-email', email);
@@ -607,7 +647,7 @@
       if (!ENDPOINT) {
         // No chat server yet: hand the message to the visitor's email app.
         const lines = transcript().map((x) => `${x.role === 'customer' ? 'Me' : 'Chesky'}: ${x.text}`).join('\n');
-        const body = `${message}\n\n${name ? 'Name: ' + name + '\n' : ''}Email: ${email}\n\n--- chat so far ---\n${lines}`;
+        const body = `${message || '(voice note: please reply and ask me to resend it as text)'}\n\n${name ? 'Name: ' + name + '\n' : ''}Email: ${email}\n\n--- chat so far ---\n${lines}`;
         window.location.href = `mailto:${EMAIL}?subject=${encodeURIComponent('Question from the website chat')}&body=${encodeURIComponent(body)}`;
         row.remove();
         const msg = { role: 'bot', text: `I've opened your email app with your message addressed to the team. If nothing opened, write to ${EMAIL}.`, chips: MAIN, links: [] };
@@ -615,15 +655,17 @@
         return;
       }
       try {
+        const voice = clip ? { data: await Voice.toBase64(clip.blob), mime: clip.mime, dur: clip.dur, peaks: clip.peaks } : undefined;
         const res = await fetch(`${ENDPOINT}/handoff`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, message, transcript: transcript(), page: location.pathname }),
+          body: JSON.stringify({ name, email, message, voice, transcript: transcript(), page: location.pathname }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.id) throw new Error(data.error || 'failed');
         lsSet(CONV, data.id);
         T('handoff');
         row.remove();
+        if (clip && !fromLog) { const vm = { role: 'user', text: 'Voice note', voice: { url: clip.url, dur: clip.dur, peaks: clip.peaks } }; state.history.push(vm); addMessage(vm); }
         enterHumanMode({ id: data.id, known: data.count || 0 });
         const total = state.history.length;
         const msg = { role: 'bot', text: `Thanks${name ? ', ' + name.split(' ')[0] : ''}! Your message is with the team. They'll reply right here and by email at ${email}. You can close this chat; any reply will be waiting when you come back.`, links: [] };
@@ -667,7 +709,7 @@
 
   const renderServer = (m) => {
     const role = m.from === 'customer' ? 'user' : m.from === 'admin' ? 'team' : m.from === 'system' ? 'system' : 'bot';
-    return { role, text: m.text, links: [] };
+    return { role, text: m.text, links: [], voice: m.voice || undefined };
   };
 
   const poll = async (initial = false) => {
@@ -724,8 +766,67 @@
     }
   };
 
+  const sendVoiceToTeam = async (clip) => {
+    const m = { role: 'user', text: 'Voice note', voice: { url: clip.url, dur: clip.dur, peaks: clip.peaks } };
+    state.history.push(m);
+    addMessage(m);
+    try {
+      const res = await fetch(`${ENDPOINT}/send`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: human.id, voice: { data: await Voice.toBase64(clip.blob), mime: clip.mime, dur: clip.dur, peaks: clip.peaks } }),
+      });
+      if (res.status === 409 || res.status === 404) {
+        addMessage({ role: 'system', text: 'This conversation has ended. Start a new chat anytime.' });
+        leaveHumanMode();
+        const msg = { role: 'bot', text: 'Anything else I can help with?', chips: MAIN, links: [] };
+        state.history.push(msg); addMessage(msg); setChips(MAIN);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'failed');
+      if (data.count != null) human.known = data.count;
+    } catch (e) {
+      addMessage({ role: 'system', text: "That voice note didn't send. Check your connection and try again." });
+    }
+  };
+
   /* ====================================================================== asking */
   let busy = false;
+
+  // Chesky can't listen to audio, so a voice note goes to the team (with the visitor's email).
+  async function onVoice(clip) {
+    T('voice');
+    if (human) { await sendVoiceToTeam(clip); return; }
+    if (busy) return;
+    busy = true;
+    setChips([]);
+    log.querySelectorAll('.chat-fb').forEach((x) => x.remove());
+    const vm = { role: 'user', text: 'Voice note', voice: { url: clip.url, dur: clip.dur, peaks: clip.peaks } };
+    state.history.push(vm);
+    addMessage(vm);
+    const t = typing();
+    await sleep(700);
+    t.remove();
+    const m = { role: 'bot', text: "Thanks for the voice note! I can't listen to audio myself, but the team can. Leave your email and they'll listen and reply right here and by email.", links: [] };
+    state.history.push(m);
+    addMessage(m);
+    addForm({ form: true, voice: clip });
+    save();
+    busy = false;
+  }
+
+  let recCtl = null;
+  const endRecording = () => { form.classList.remove('rec'); recHost.innerHTML = ''; recHost.className = 'chat-rec'; recCtl = null; };
+  mic.addEventListener('click', () => {
+    if (recCtl || !canVoice) return;
+    form.classList.add('rec');
+    recHost.classList.add('vr-live');
+    recCtl = Voice.recorderBar(recHost, {
+      onSend: (clip) => { endRecording(); onVoice(clip); },
+      onCancel: () => endRecording(),
+      onError: (msg) => { endRecording(); addMessage({ role: 'system', text: msg }); },
+    });
+  });
 
   async function ask(text) {
     text = text.trim();
@@ -789,7 +890,7 @@
     }
     save();
     busy = false;
-    input.focus({ preventScroll: true });
+    if (!phone.matches) input.focus({ preventScroll: true });
   }
 
   form.addEventListener('submit', (e) => { e.preventDefault(); ask(input.value); });
@@ -814,15 +915,39 @@
       setChips(hello.chips);
       save();
     }
-    setTimeout(() => input.focus({ preventScroll: true }), 250);
+    if (!phone.matches) setTimeout(() => input.focus({ preventScroll: true }), 250);  // on phones, don't pop the keyboard up on open
   };
   function close() {
+    if (recCtl) recCtl.cancel();
     isOpen = false;
     panel.classList.remove('open');
     fab.classList.remove('open');
     fab.setAttribute('aria-expanded', 'false');
     fab.setAttribute('aria-label', 'Chat with Chesky');
+    fitKeyboard();
   }
+
+  /* On phones the on-screen keyboard covers the bottom of the page. The visual viewport is the part
+     that is really visible, so while the keyboard is up the chat is sized and placed to exactly fill it. */
+  const vv = window.visualViewport;
+  const phone = window.matchMedia('(max-width: 720px)');
+  const fitKeyboard = () => {
+    const covered = vv ? window.innerHeight - vv.height : 0;
+    if (!vv || !isOpen || !phone.matches || covered < 100) {
+      panel.classList.remove('kb');
+      panel.style.removeProperty('--vvh');
+      panel.style.removeProperty('--vvt');
+      return;
+    }
+    panel.style.setProperty('--vvh', vv.height + 'px');
+    panel.style.setProperty('--vvt', vv.offsetTop + 'px');
+    panel.classList.add('kb');
+    scroll();
+  };
+  if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
+  window.addEventListener('orientationchange', () => setTimeout(fitKeyboard, 300));
+  panel.addEventListener('focusin', () => { setTimeout(fitKeyboard, 50); setTimeout(fitKeyboard, 350); });
+  panel.addEventListener('focusout', () => setTimeout(fitKeyboard, 350));
 
   fab.addEventListener('click', () => (isOpen ? close() : open()));
   panel.querySelector('.chat-x').addEventListener('click', close);

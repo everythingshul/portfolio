@@ -43,6 +43,7 @@
   .m small { display: block; font-size: 0.72rem; opacity: 0.7; margin-top: 4px; }
   .m.customer { align-self: flex-start; background: var(--panel); color: var(--ink); border-radius: 14px 14px 14px 3px; }
   .m.admin { align-self: flex-end; background: var(--cyan); color: var(--on-cyan); border-radius: 14px 14px 3px 14px; }
+  .m .vp { --fg: var(--cyan); --bg: var(--panel); }
   .m.bot { align-self: flex-start; background: transparent; border: 1px dashed var(--line); color: var(--ink-3); border-radius: 14px 14px 14px 3px; }
   .reply { border-top: 1px solid var(--rule); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
   .reply textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; resize: vertical; }
@@ -200,6 +201,7 @@
 </main>
 <div class="toast" id="toast" hidden></div>
 <script src="../js/chat-config.js"></script>
+<script src="../js/voice.js"></script>
 <script src="../js/chat-kb.js"></script>
 <script src="analytics.js"></script>
 <script src="admin.js"></script>

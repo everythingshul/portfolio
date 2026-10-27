@@ -289,6 +289,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const ENDPOINT = 'https://everythingshul-contact.everythingshul.workers.dev';
     const success = document.querySelector('.form-success');
     const error = document.querySelector('.form-error');
+
+    /* Optional voice note, WhatsApp style: record, listen back, remove or send with the form. */
+    const Voice = window.ESVoice;
+    const vfield = document.getElementById('voice-field');
+    const msgBox = form.elements.message;
+    let clip = null;
+    const renderVoice = (problem) => {
+      if (!vfield || !Voice || !Voice.supported) return;
+      vfield.hidden = false;
+      vfield.innerHTML = '';
+      msgBox.required = !clip;
+      if (clip) {
+        const box = document.createElement('div');
+        box.className = 'vclip';
+        box.appendChild(Voice.player(clip));
+        const x = document.createElement('button');
+        x.type = 'button'; x.className = 'vclip-x'; x.textContent = 'Remove';
+        x.addEventListener('click', () => { clip = null; renderVoice(); });
+        box.appendChild(x);
+        vfield.appendChild(box);
+      } else {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'field-voice-btn';
+        b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Or record a voice note';
+        b.addEventListener('click', () => {
+          T('fm', 'voice_start');
+          b.remove();
+          const host = document.createElement('div');
+          host.className = 'vr-host on';
+          vfield.insertBefore(host, vfield.firstChild);
+          Voice.recorderBar(host, {
+            done: true, sendLabel: 'Attach voice note',
+            onSend: (c) => { clip = c; renderVoice(); },
+            onCancel: () => renderVoice(),
+            onError: (msg) => renderVoice(msg),
+          });
+        });
+        vfield.appendChild(b);
+      }
+      const err = document.createElement('p');
+      err.className = 'field-voice-err'; err.setAttribute('role', 'alert'); err.textContent = problem || '';
+      vfield.appendChild(err);
+    };
+    renderVoice();
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = form.querySelector('button[type="submit"]');
@@ -297,13 +342,17 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.textContent = 'Sending...';
       if (error) error.style.display = 'none';
       try {
+        const payload = Object.fromEntries(new FormData(form));
+        if (clip) payload.voice = { data: await Voice.toBase64(clip.blob), mime: clip.mime, dur: clip.dur };
         const res = await fetch(ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(Object.fromEntries(new FormData(form)))
+          body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'failed');
         form.reset();
+        if (clip) T('fm', 'voice_sent');
+        clip = null; renderVoice();
         T('fm', 'ok');
         if (success) success.classList.add('show');
       } catch (err) {
@@ -316,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
           d.org ? `Organization: ${d.org}` : null,
           d.interest ? `Interested in: ${d.interest}` : null,
           '',
-          d.message
+          d.message || '(I recorded a voice note: please reply and ask me to resend it as text.)'
         ].filter((l) => l !== null);
         window.location.href = `mailto:everythingshul@gmail.com?subject=${encodeURIComponent('Project inquiry from ' + (d.name || 'your site'))}&body=${encodeURIComponent(lines.join('\n'))}`;
         if (error) {

@@ -4,6 +4,7 @@
 //     POST /handoff   start a conversation (email + question), emails the team and the visitor
 //     POST /send      add a visitor message to an open conversation
 //     GET  /poll      fetch messages the visitor hasn't seen yet
+//     GET  /voice     play a voice note (the id in the link is the secret)
 //     GET  /learned  answers the team has taught Chesky (public, read-only)
 //     POST /log      anonymous "I couldn't answer this" / thumbs up / thumbs down events
 //     POST /t        site analytics events (see stats.js)
@@ -19,6 +20,9 @@ const MAX_TEXT = 1500;
 const MAX_MESSAGES = 300;
 const TTL = 60 * 60 * 24 * 180; // forget conversations after 180 days
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_VOICE_B64 = 3_200_000;   // about 2.4 MB of audio
+const MAX_VOICE_SECONDS = 65;
+const VOICE_TYPES = { 'audio/wav': 'wav', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/webm': 'webm' };
 
 const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, max);
 const oneLine = (v, max) => clean(v, max).replace(/[\r\n]+/g, ' ');
@@ -49,6 +53,38 @@ const safeEqual = (a, b) => {
 /* ------------------------------------------------------------------ storage */
 const getConv = async (env, id) => (ID_RE.test(id || '') ? env.CHAT.get(`conv:${id}`, 'json') : null);
 
+const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`;
+
+// Validates a voice note sent as {data (base64), mime, dur, peaks}, stores the audio, and returns the chat message for it
+// plus the attachment to put on the team's email (Brevo can't take .webm, so those are only playable in the inbox).
+async function saveVoice(env, v) {
+  if (!v || typeof v.data !== 'string' || !v.data || v.data.length > MAX_VOICE_B64) return null;
+  const mime = String(v.mime || '').split(';')[0].toLowerCase();
+  const ext = VOICE_TYPES[mime];
+  if (!ext || !/^[A-Za-z0-9+/]+=*$/.test(v.data)) return null;
+  let bytes;
+  try { bytes = Uint8Array.from(atob(v.data), (c) => c.charCodeAt(0)); } catch { return null; }
+  if (bytes.length < 200) return null;
+  const dur = Math.max(0.5, Math.min(MAX_VOICE_SECONDS, Number(v.dur) || 0));
+  const peaks = (Array.isArray(v.peaks) ? v.peaks : []).slice(0, 48).map((n) => Math.max(0, Math.min(100, Math.round(Number(n) || 0))));
+  const id = newId();
+  await env.CHAT.put(`voice:${id}`, bytes, { expirationTtl: TTL, metadata: { mime } });
+  return {
+    message: { text: `Voice note (${fmtDur(dur)})`, voice: { id, dur, mime, peaks } },
+    attachment: ext === 'webm' ? null : [{ name: `voice-note.${ext}`, content: v.data }],
+  };
+}
+
+async function voiceFile(url, env) {
+  const id = url.searchParams.get('id') || '';
+  if (!ID_RE.test(id)) return new Response('Not found', { status: 404 });
+  const { value, metadata } = await env.CHAT.getWithMetadata(`voice:${id}`, 'arrayBuffer');
+  if (!value) return new Response('Not found', { status: 404 });
+  return new Response(value, { status: 200, headers: { 'Content-Type': (metadata && metadata.mime) || 'audio/wav', 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' } });
+}
+
+const publicMsg = (m) => ({ from: m.from, text: m.text, ts: m.ts, ...(m.voice ? { voice: m.voice } : {}) });
+
 const summary = (c) => ({
   id: c.id, name: c.name, email: c.email, status: c.status, unread: !!c.unread,
   created: c.created, updated: c.updated, count: c.messages.length,
@@ -65,6 +101,8 @@ async function putConv(env, c, touch = true) {
 }
 
 async function dropConv(env, id) {
+  const conv = await getConv(env, id);
+  if (conv) await Promise.all(conv.messages.filter((m) => m.voice).map((m) => env.CHAT.delete(`voice:${m.voice.id}`)));
   await env.CHAT.delete(`conv:${id}`);
   const idx = (await env.CHAT.get('idx', 'json')) || [];
   await env.CHAT.put('idx', JSON.stringify(idx.filter((x) => x.id !== id)));
@@ -83,9 +121,10 @@ async function brevo(env, payload) {
 const adminLink = (env, id) => `${env.SITE_URL}/admin/#${id}`;
 const chatLink = (env, id) => `${env.SITE_URL}/#chat=${id}`;
 
-async function mailAdmin(env, conv, text, isNew) {
+async function mailAdmin(env, conv, text, isNew, attachment) {
   const label = conv.name || conv.email;
   await brevo(env, {
+    ...(attachment ? { attachment } : {}),
     to: [{ email: env.ADMIN_EMAIL }],
     replyTo: { email: conv.email, name: conv.name || conv.email },
     subject: `${isNew ? 'New chat request' : 'New chat message'} from ${oneLine(label, 80)}`,
@@ -194,7 +233,9 @@ async function handoff(request, env, h) {
   try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
   const email = oneLine(b.email, 200);
   const message = clean(b.message, MAX_TEXT);
-  if (!EMAIL_RE.test(email) || !message) return json({ error: 'Please give a valid email and a message.' }, 400, h);
+  const voice = b.voice ? await saveVoice(env, b.voice) : null;
+  if (b.voice && !voice) return json({ error: 'That voice note could not be used. Please try recording it again.' }, 400, h);
+  if (!EMAIL_RE.test(email) || (!message && !voice)) return json({ error: 'Please give a valid email and a message.' }, 400, h);
 
   const now = Date.now();
   const earlier = (Array.isArray(b.transcript) ? b.transcript : []).slice(-14)
@@ -203,12 +244,13 @@ async function handoff(request, env, h) {
   const conv = {
     id: newId(), name: oneLine(b.name, 120), email, status: 'open', unread: true, created: now, updated: now, notifiedAt: now,
     page: oneLine(b.page, 100),
-    messages: [...earlier, { from: 'customer', text: message, ts: now }],
+    messages: [...earlier, ...(message ? [{ from: 'customer', text: message, ts: now }] : []), ...(voice ? [{ from: 'customer', ...voice.message, ts: now }] : [])],
   };
   await putConv(env, conv);
 
   const out = { ok: true };
-  try { await mailAdmin(env, conv, message, true); } catch (e) { console.error('admin mail', e.message); out.adminMail = false; }
+  const mailText = [message, voice && `🎤 ${voice.message.text}${voice.attachment ? ' is attached to this email' : ''}. You can also play it in the admin page.`].filter(Boolean).join('\n\n');
+  try { await mailAdmin(env, conv, mailText, true, voice && voice.attachment); } catch (e) { console.error('admin mail', e.message); out.adminMail = false; }
   try {
     await brevo(env, {
       to: [{ email: conv.email, name: conv.name || conv.email }],
@@ -225,19 +267,26 @@ async function send(request, env, h) {
   let b;
   try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
   const conv = await getConv(env, b.id);
-  const text = clean(b.text, MAX_TEXT);
+  let text = clean(b.text, MAX_TEXT);
   if (!conv) return json({ error: 'Not found' }, 404, h);
-  if (!text) return json({ error: 'Empty message' }, 400, h);
   if (conv.status === 'closed') return json({ error: 'Closed' }, 409, h);
   if (conv.messages.length >= MAX_MESSAGES) return json({ error: 'Too long' }, 409, h);
+  let voice = null;
+  if (b.voice) {
+    if (await limited(env, request, 'voice', 20)) return json({ error: 'Too many voice notes. Please type your message.' }, 429, h);
+    voice = await saveVoice(env, b.voice);
+    if (!voice) return json({ error: 'That voice note could not be used.' }, 400, h);
+  }
+  if (!text && !voice) return json({ error: 'Empty message' }, 400, h);
 
-  conv.messages.push({ from: 'customer', text, ts: Date.now() });
+  if (text) conv.messages.push({ from: 'customer', text, ts: Date.now() });
+  if (voice) { conv.messages.push({ from: 'customer', ...voice.message, ts: Date.now() }); text = [text, `🎤 ${voice.message.text}${voice.attachment ? ' is attached' : ''}`].filter(Boolean).join('\n\n'); }
   conv.unread = true;
   // Don't email the team for every line of a quick back-and-forth.
   const notify = !conv.notifiedAt || Date.now() - conv.notifiedAt > 30000;
   if (notify) conv.notifiedAt = Date.now();
   await putConv(env, conv);
-  if (notify) { try { await mailAdmin(env, conv, text, false); } catch (e) { console.error('admin mail', e.message); } }
+  if (notify || voice) { try { await mailAdmin(env, conv, text, false, voice && voice.attachment); } catch (e) { console.error('admin mail', e.message); } }
   return json({ ok: true, count: conv.messages.length }, 200, h);
 }
 
@@ -246,7 +295,7 @@ async function poll(url, env, h) {
   if (!conv) return json({ error: 'Not found' }, 404, h);
   const after = Math.max(0, parseInt(url.searchParams.get('after') || '0', 10) || 0);
   return json({
-    messages: conv.messages.slice(after).map((m) => ({ from: m.from, text: m.text, ts: m.ts })),
+    messages: conv.messages.slice(after).map(publicMsg),
     total: conv.messages.length,
     status: conv.status,
   }, 200, h);
@@ -386,6 +435,8 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const h = corsHeaders(origin, env);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: h });
+    // <audio> tags send no Origin header; the unguessable id in the link is what protects a voice note.
+    if (url.pathname === '/voice' && request.method === 'GET') return await voiceFile(url, env);
     if (!origins(env).includes(origin)) return json({ error: 'Forbidden' }, 403, h);
 
     try {

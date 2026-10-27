@@ -46,7 +46,7 @@ const row = (label, value) =>
   `<tr><td style="padding:9px 14px;width:140px;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:${C.muted};border-bottom:1px solid ${C.border};vertical-align:top;">${esc(label)}</td>
 <td style="padding:9px 14px;color:${C.body};border-bottom:1px solid ${C.border};">${value}</td></tr>`;
 
-export function notificationEmail({ name, email, org, interest, message }, siteUrl) {
+export function notificationEmail({ name, email, org, interest, message }, siteUrl, voiceLength) {
   const rows = [
     row('Name', esc(name)),
     row('Email', `<a href="mailto:${esc(email)}" style="color:${C.goldDark};">${esc(email)}</a>`),
@@ -56,18 +56,19 @@ export function notificationEmail({ name, email, org, interest, message }, siteU
   const content = `${heading('New project inquiry')}
 <p style="margin:0 0 18px;">${esc(name)} sent a message through the Everything Shul contact form.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.panel2};border:1px solid ${C.border};border-radius:8px;border-collapse:separate;margin-bottom:20px;">${rows}</table>
-<div style="background:${C.panel2};border-left:3px solid ${C.gold};padding:14px 16px;border-radius:4px;margin-bottom:24px;">${multiline(message)}</div>
+${message ? `<div style="background:${C.panel2};border-left:3px solid ${C.gold};padding:14px 16px;border-radius:4px;margin-bottom:24px;">${multiline(message)}</div>` : ''}
+${voiceLength ? `<p style="margin:0 0 24px;padding:12px 16px;background:${C.panel2};border:1px solid ${C.border};border-radius:6px;">🎤 <strong>Voice note (${esc(voiceLength)})</strong> is attached to this email. Open the attachment to listen.</p>` : ''}
 <a href="mailto:${esc(email)}?subject=${encodeURIComponent('Re: your inquiry')}" style="display:inline-block;background:${C.goldDark};color:#ffffff;text-decoration:none;padding:11px 22px;border-radius:6px;font-weight:600;font-size:14px;">Reply to ${esc(name)}</a>
 <p style="margin:24px 0 0;"></p>`;
-  return shell({ siteUrl, preheader: `${name}: ${message.slice(0, 90)}`, title: 'New project inquiry', content });
+  return shell({ siteUrl, preheader: `${name}: ${message ? message.slice(0, 90) : 'sent a voice note'}`, title: 'New project inquiry', content });
 }
 
-export function confirmationEmail({ name, message }, siteUrl) {
+export function confirmationEmail({ name, message }, siteUrl, hadVoice) {
   const first = name.trim().split(/\s+/)[0];
   const content = `${heading(`Thanks, ${first}. We got your message.`)}
 <p style="margin:0 0 16px;">We've received your inquiry and will reply personally, usually within one business day.</p>
 <p style="margin:0 0 8px;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:${C.muted};">Your message</p>
-<div style="background:${C.panel2};border-left:3px solid ${C.gold};padding:14px 16px;border-radius:4px;margin-bottom:24px;">${multiline(message)}</div>
+<div style="background:${C.panel2};border-left:3px solid ${C.gold};padding:14px 16px;border-radius:4px;margin-bottom:24px;">${message ? multiline(message) : ''}${hadVoice ? `${message ? '<br><br>' : ''}🎤 Voice note` : ''}</div>
 <p style="margin:0 0 24px;">If you need to add anything, just reply to this email.</p>
 <p style="margin:0 0 24px;">Talk soon,<br><span style="font-family:Georgia,'Times New Roman',serif;color:${C.dark};">The Everything Shul team</span></p>`;
   return shell({ siteUrl, preheader: 'We received your message and will be in touch shortly.', title: 'We received your message', content });
