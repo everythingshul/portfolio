@@ -124,7 +124,7 @@ def footer():
     </div>
     <div class="footer-bottom">
       <span>© 2026 Everything Shul. All rights reserved.</span>
-      <span><a href="privacy.html">Privacy</a> · everythingshul@gmail.com</span>
+      <span><a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · everythingshul@gmail.com</span>
     </div>
   </div>
 </footer>
@@ -343,6 +343,7 @@ def contact_html():
         <div class="field-voice" id="voice-field" hidden></div>
         <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
         <button type="submit" class="btn">Send message</button>
+        <p class="form-legal">By sending this you agree to our <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy</a> page.</p>
         <p class="form-success">Thanks — your message is on its way. Check your inbox for a confirmation.</p>
         <p class="form-error"></p>
       </form>
@@ -391,8 +392,45 @@ def privacy_html():
     <p>We keep your contact details, our invoices and quotes, and payment records so we can bill you and support you. Card and bank payments are handled by Stripe on its own secure page; card numbers never reach this website or our systems. We do not sell or share this information.</p>
     <h2>Contact form and chat</h2>
     <p>If you send a message or ask to talk to the team in the chat, your message and email address go to us so we can reply. If you record a voice note, the recording goes to us the same way and is only used to listen and reply. Questions the chat could not answer are saved without any personal details so we can teach it better answers.</p>
+    <h2>Terms</h2>
+    <p>The rules for using this website and for working with us are in our <a href="terms.html">Terms and Conditions</a>.</p>
     <h2>Questions</h2>
     <p>Write to <a href="mailto:everythingshul@gmail.com">everythingshul@gmail.com</a> and we will answer, or delete anything you sent us.</p>
+  </div></div>
+</section>
+
+{footer()}
+{chat_scripts()}<script src="js/main.js"></script>
+</body>
+</html>
+'''
+
+def terms_html():
+    import legal
+    title = 'Terms and Conditions — Everything Shul'
+    desc = 'The terms for using the Everything Shul website and for buying our software, hosting and support.'
+    toc = '\n'.join(f'      <li><a href="#{a}">{e(h)}</a></li>' for a, h, _ in legal.SECTIONS)
+    body = '\n'.join(f'    <h2 id="{a}">{i}. {e(h)}</h2>{b}' for i, (a, h, b) in enumerate(legal.SECTIONS, 1))
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+{head(title, desc, og(title, desc, 'home.jpg', SITE + '/terms.html') + '<link rel="stylesheet" href="css/style.css" />')}
+</head>
+<body>
+
+{NAV}
+<header class="page-hero">
+  <div class="container">
+    <h1>Terms and Conditions</h1>
+    <p>Last updated {legal.TERMS_UPDATED}. Plain-language terms for using our website and for working with us.</p>
+  </div>
+</header>
+<section class="section">
+  <div class="container"><div class="prose">
+    <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
+{toc}
+    </ol></nav>
+{body}
   </div></div>
 </section>
 
@@ -426,6 +464,7 @@ if __name__ == '__main__':
     open(os.path.join(root, 'index.html'), 'w').write(index_html())
     open(os.path.join(root, 'contact.html'), 'w').write(contact_html())
     open(os.path.join(root, 'privacy.html'), 'w').write(privacy_html())
+    open(os.path.join(root, 'terms.html'), 'w').write(terms_html())
     for p in PROJECTS:
         d = os.path.join(root, 'share', p['id'])
         os.makedirs(d, exist_ok=True)

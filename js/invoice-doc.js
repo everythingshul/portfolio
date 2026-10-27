@@ -36,7 +36,7 @@
     ${d.terms ? `<div><div class="inv-label">Terms</div><p>${esc(d.terms)}</p></div>` : ''}
     ${show && d.payments && d.payments.length ? `<div><div class="inv-label">Payments</div><div class="inv-pays">${d.payments.map((p) => `<div><span>${esc(new Date(p.received_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }))} · ${esc(METHOD[p.method] || 'Payment')}</span><span>${esc(money(p.amount_cents, cur))}</span></div>`).join('')}</div></div>` : ''}
   </footer>
-  <div class="inv-legal">Thank you for your business.</div>
+  <div class="inv-legal">Thank you for your business. Services are provided under our <a href="/terms.html" target="_blank" rel="noopener">Terms and Conditions</a>.</div>
 </article>`;
   }
   window.ESInvoiceDoc = { render, money, esc };

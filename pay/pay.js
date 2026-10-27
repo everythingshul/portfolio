@@ -26,7 +26,7 @@
     const bar = `<div class="bar no-print"><div class="who">${esc(d.business.name)} · ${q ? 'Quote' : 'Invoice'} ${esc(d.number)}</div><div class="actions"><button class="btn ghost" id="print" type="button">Print or save as PDF</button></div></div>`;
     const pay = d.can_pay && d.balance > 0
       ? `<div class="paybox no-print"><span class="secure">Secure payment by card or bank transfer, powered by Stripe.</span><button class="btn big" id="pay" type="button">Pay ${esc(Doc.money(d.balance, d.currency))}</button></div>` : '';
-    const answer = canAnswer ? `<div class="paybox no-print"><button class="btn ghost" id="decline" type="button">Decline</button><button class="btn big" id="accept" type="button">Accept this quote</button></div>` : '';
+    const answer = canAnswer ? `<div class="paybox no-print"><span class="secure">By accepting you agree to this quote and our <a href="/terms.html" target="_blank" rel="noopener">Terms and Conditions</a>.</span><button class="btn ghost" id="decline" type="button">Decline</button><button class="btn big" id="accept" type="button">Accept this quote</button></div>` : '';
     const unpaid = !q && d.status === 'sent' && d.balance > 0 && !d.can_pay ? `<div class="banner info no-print" style="margin-top:16px">To pay this invoice, please contact ${esc(d.business.email || d.business.name)}.</div>` : '';
     root.innerHTML = (banner || '') + bar + Doc.render(d) + pay + answer + unpaid;
     document.getElementById('print').addEventListener('click', () => window.print());

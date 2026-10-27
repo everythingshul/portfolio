@@ -495,24 +495,24 @@ export async function reports(env, from, to) {
   return { from, to, byMonth, byCustomer, byMethod, invoiced, tax: tax.s, status };
 }
 
-const csvCell = (v) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-const csv = (head, rows) => [head.join(','), ...rows.map((r) => r.map(csvCell).join(','))].join('\r\n');
-const cents = (n) => ((n || 0) / 100).toFixed(2);
+const dollarsOf = (n) => Math.round(n || 0) / 100;
 
-export async function exportCsv(env, kind, from, to) {
+// Rows for the Excel export (see xlsx.js). Money is exported as real numbers, dates as real dates.
+export async function exportData(env, kind, from, to) {
   if (kind === 'customers') {
     const rows = await all(env, 'SELECT * FROM customers ORDER BY LOWER(name)');
-    return csv(['Name', 'Organization', 'Email', 'Phone', 'Address 1', 'Address 2', 'City', 'State', 'ZIP', 'Country', 'Status', 'Source', 'Tags', 'Notes'],
-      rows.map((c) => [c.name, c.org, c.email, c.phone, c.addr1, c.addr2, c.city, c.state, c.zip, c.country, c.status, c.source, c.tags, c.notes]));
+    return { name: 'Customers', cols: [{ h: 'Name' }, { h: 'Organization' }, { h: 'Email' }, { h: 'Phone' }, { h: 'Address 1' }, { h: 'Address 2' }, { h: 'City' }, { h: 'State' }, { h: 'ZIP' }, { h: 'Country' }, { h: 'Status' }, { h: 'Source' }, { h: 'Tags' }, { h: 'Notes', w: 50 }, { h: 'Added', t: 'datetime' }],
+      rows: rows.map((c) => [c.name, c.org, c.email, c.phone, c.addr1, c.addr2, c.city, c.state, c.zip, c.country, c.status, c.source, c.tags, c.notes, c.created]) };
   }
   const f = validDate(from) ? from : '0000-01-01', t = validDate(to) ? to : '9999-12-31';
   if (kind === 'payments') {
     const rows = await all(env, `SELECT p.*, i.number, c.name, c.org FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id LEFT JOIN customers c ON c.id = p.customer_id WHERE date(p.received_at / 1000, 'unixepoch') >= ? AND date(p.received_at / 1000, 'unixepoch') <= ? ORDER BY p.received_at`, f, t);
-    return csv(['Date', 'Invoice', 'Customer', 'Amount', 'Method', 'Reference', 'Note'], rows.map((p) => [new Date(p.received_at).toISOString().slice(0, 10), p.number, p.org || p.name, cents(p.amount_cents), p.method, p.ref, p.note]));
+    return { name: 'Payments', cols: [{ h: 'Date', t: 'date' }, { h: 'Invoice' }, { h: 'Customer' }, { h: 'Amount', t: 'money' }, { h: 'Method' }, { h: 'Reference' }, { h: 'Note', w: 40 }],
+      rows: rows.map((p) => [new Date(p.received_at).toISOString().slice(0, 10), p.number, p.org || p.name, dollarsOf(p.amount_cents), p.method, p.ref, p.note]) };
   }
   const rows = await all(env, `SELECT i.*, c.name, c.org, c.email FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id WHERE i.issue_date >= ? AND i.issue_date <= ? ORDER BY i.issue_date, i.number`, f, t);
-  return csv(['Type', 'Number', 'Customer', 'Email', 'Status', 'Issue date', 'Due date', 'Subtotal', 'Discount', 'Tax', 'Total', 'Paid', 'Balance', 'Currency'],
-    rows.map((i) => { const d = decorate(i); return [i.kind, i.number, i.org || i.name, i.email, d.state, i.issue_date, i.due_date, cents(i.subtotal), cents(i.discount_cents), cents(i.tax_cents), cents(i.total), cents(i.paid), cents(d.balance), i.currency]; }));
+  return { name: 'Invoices', cols: [{ h: 'Type' }, { h: 'Number' }, { h: 'Customer' }, { h: 'Email' }, { h: 'Status' }, { h: 'Issue date', t: 'date' }, { h: 'Due date', t: 'date' }, { h: 'Subtotal', t: 'money' }, { h: 'Discount', t: 'money' }, { h: 'Tax', t: 'money' }, { h: 'Total', t: 'money' }, { h: 'Paid', t: 'money' }, { h: 'Balance', t: 'money' }, { h: 'Currency' }],
+    rows: rows.map((i) => { const d = decorate(i); return [i.kind, i.number, i.org || i.name, i.email, d.state, i.issue_date, i.due_date, dollarsOf(i.subtotal), dollarsOf(i.discount_cents), dollarsOf(i.tax_cents), dollarsOf(i.total), dollarsOf(i.paid), dollarsOf(d.balance), (i.currency || '').toUpperCase()]; }) };
 }
 
 /* ------------------------------------------------------------------ import (Wix and other CSVs; the page maps the columns) */
