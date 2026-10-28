@@ -59,7 +59,7 @@
 
   VIEW.overview = async (el) => {
     const rp = rangeParams();
-    const d = await api('/admin/b/dashboard?' + new URLSearchParams(rp));
+    const d = await api('/admin/b/dashboard?' + new URLSearchParams({ ...rp, tz: new Date().getTimezoneOffset() }));
     await loadSettings();
     // fill the empty days/months so the chart has no gaps
     const bm = Object.fromEntries(d.buckets.map((x) => [x.k, x.s]));
@@ -414,7 +414,7 @@
       <select id="p-m"><option value="">All methods</option>${METHODS.map(([k, l]) => `<option value="${k}"${q.method === k ? ' selected' : ''}>${l}</option>`).join('')}</select><span class="grow"></span><button class="small-btn" id="p-export">Export to Excel</button></div><div id="p-body"></div>`;
     const fetchIt = async () => {
       q.q = $('p-q').value.trim(); q.from = $('p-from').value; q.to = $('p-to').value; q.method = $('p-m').value;
-      const d = await api('/admin/b/payments?' + new URLSearchParams(q));
+      const d = await api('/admin/b/payments?' + new URLSearchParams({ ...q, tz: new Date().getTimezoneOffset() }));
       $('p-body').innerHTML = table(['Date', 'Customer', 'Invoice', 'Method', 'Reference', '>Amount'], d.payments.map((p) => `<tr data-inv="${esc(p.invoice_id)}"><td>${esc(U.fmtDay(p.received_at))}</td><td>${esc(who(p))}</td><td>${esc(p.invoice_number || '')}</td><td>${esc(methodName(p.method))}</td><td>${esc(p.ref || '')}</td><td class="n">${esc(money(p.amount_cents))}</td></tr>`), true) + `<p class="anote">${d.summary.n} payment${d.summary.n === 1 ? '' : 's'} · ${esc(money(d.summary.s))} net</p>`;
       $('p-body').querySelectorAll('tr[data-inv]').forEach((r) => r.addEventListener('click', () => go(r.dataset.inv)));
     };
@@ -446,7 +446,7 @@
   /* ------------------------------------------------------------------ reports */
   VIEW.reports = async (el) => {
     const q = st.rep;
-    const d = await api('/admin/b/reports?' + new URLSearchParams(q));
+    const d = await api('/admin/b/reports?' + new URLSearchParams({ ...q, tz: new Date().getTimezoneOffset() }));
     el.innerHTML = `<div class="toolbar"><label class="subtle">From <input type="date" id="rp-from" value="${esc(d.from)}"></label><label class="subtle">To <input type="date" id="rp-to" value="${esc(d.to)}"></label><button class="small-btn" id="rp-go">Update</button><span class="grow"></span><button class="small-btn" id="rp-ex1">Invoices (Excel)</button><button class="small-btn" id="rp-ex2">Payments (Excel)</button><button class="small-btn" id="rp-ex3">Customers (Excel)</button></div>
       <div class="kpis">${kpi('Invoiced', esc(money(d.invoiced.s)), `${d.invoiced.n} invoice${d.invoiced.n === 1 ? '' : 's'}`)}${kpi('Received', esc(money(d.byMonth.reduce((a, m) => a + m.received, 0))), '', 'good')}${kpi('Refunded', esc(money(d.byMonth.reduce((a, m) => a + m.refunded, 0))))}${kpi('Net income', esc(money(d.byMonth.reduce((a, m) => a + m.net, 0))))}${kpi('Tax charged', esc(money(d.tax)), 'on invoices issued in this period')}</div>
       <div class="grid2">${card('By month', table(['Month', '>Received', '>Refunded', '>Net'], d.byMonth.map((m) => `<tr><td>${esc(new Date(m.m + '-15').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }))}</td><td class="n">${esc(money(m.received))}</td><td class="n">${m.refunded ? esc(money(m.refunded)) : '—'}</td><td class="n"><strong>${esc(money(m.net))}</strong></td></tr>`)))}

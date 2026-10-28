@@ -26,7 +26,7 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
         case 'invoice': return json(await B.getInvoice(env, need(q.id, 'id')), 200, h);
         case 'payments': return json(await B.listPayments(env, q), 200, h);
         case 'recurring': return json({ recurring: await B.listRecurring(env) }, 200, h);
-        case 'reports': return json(await B.reports(env, q.from, q.to), 200, h);
+        case 'reports': return json(await B.reports(env, q.from, q.to, q), 200, h);
         case 'search': return json(await B.search(env, q.q), 200, h);
         case 'export': {
           const kind = ['customers', 'payments'].includes(q.kind) ? q.kind : 'invoices';
