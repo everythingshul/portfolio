@@ -185,6 +185,14 @@ and footer.
    STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET. Daily cron makes repeating invoices and sends reminders. Wix import is a CSV
    column-mapping wizard (Billing -> Import). Contact form and chat handoffs create CRM leads automatically (the contact Worker
    shares the BILL database). Keep copy about money neutral and do not store card data (Stripe handles it).
+   Paying: the invoice page (/pay/) shows Stripe's Payment Element on the page itself (needs the publishable key `stripe_pk`, saved in
+   Billing -> Settings; without it the page falls back to Stripe's hosted Checkout). Flow: POST /i/intent -> Stripe.js confirms ->
+   POST /i/confirm (server re-reads the PaymentIntent from Stripe and records the payment, idempotent with the webhook, which handles
+   payment_intent.succeeded / payment_failed / charge.refunded). Each invoice has `online_pay` (0 = no Pay form, set from the invoice page
+   or editor). Refunds are made from the admin invoice page (POST /admin/b/payment/refund -> Stripe /v1/refunds, recorded as a negative
+   `stripe_refund` payment using the same running-total marker as the webhook so nothing is counted twice). The Billing overview takes a
+   date range (30 days, 3/6/12 months, all time, custom); owed/overdue are always "now". Migrations for older databases live in
+   worker/chat/billing-migrate-*.sql (the deploy script runs them all).
    Invoice documents follow the old Wix invoices' look (css/invoice.css: navy text, light-blue table header, balance box); an invoice has a
    `title` shown above the items, and the first row of a line's text is the item name with the rest as grey details. Invoice numbers use
    prefix + counter padded to `invoice_pad` digits (production uses prefix "" and 7 digits, e.g. 0003114, continuing the Wix numbering).

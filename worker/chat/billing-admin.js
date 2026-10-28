@@ -1,6 +1,6 @@
 // The /admin/b/* API used by the Customers and Billing tabs of /admin/. Only reached after the admin password is checked.
 import * as B from './billing.js';
-import { sendInvoice, stripeStatus } from './billing-pay.js';
+import { sendInvoice, stripeStatus, refundPayment } from './billing-pay.js';
 import { buildXlsx, XLSX_TYPE } from './xlsx.js';
 
 const need = (v, what) => { if (!v) throw B.fail(`Missing ${what}`); return v; };
@@ -13,7 +13,7 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
     if (request.method === 'GET') {
       const q = Object.fromEntries(sp.entries());
       switch (path) {
-        case 'dashboard': return json(await B.dashboard(env), 200, h);
+        case 'dashboard': return json(await B.dashboard(env, q), 200, h);
         case 'settings': return json({ settings: await B.getSettings(env) }, 200, h);
         case 'stripe': return json(await stripeStatus(env), 200, h);
         case 'customers': return json(await B.listCustomers(env, q), 200, h);
@@ -66,6 +66,8 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
         const r = await B.addPayment(env, { invoice_id: need(b.invoice_id, 'invoice'), amount_cents: b.amount_cents, method: b.method, ref: b.ref, note: b.note, received_at: date });
         return json({ ok: true, becamePaid: !!(r && r.becamePaid) }, 200, h);
       }
+      case 'payment/refund': return json(await refundPayment(env, need(b.id, 'id'), b), 200, h);
+      case 'invoice/online-pay': await env.BILL.prepare('UPDATE invoices SET online_pay = ?, updated = ? WHERE id = ?').bind(b.on ? 1 : 0, Date.now(), need(b.id, 'id')).run(); return json({ ok: true }, 200, h);
       case 'payment/delete': await B.deletePayment(env, need(b.id, 'id')); return json({ ok: true }, 200, h);
       case 'recurring/save': return json({ id: await B.saveRecurring(env, b) }, 200, h);
       case 'recurring/delete': await B.deleteRecurring(env, need(b.id, 'id')); return json({ ok: true }, 200, h);

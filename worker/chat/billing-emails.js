@@ -69,6 +69,18 @@ ${summary([['Invoice', esc(i.number)], ['Amount paid', esc(money(paidCents, cur)
   return shell({ siteUrl, preheader: `Payment of ${money(paidCents, cur)} received`, title: 'Payment received', content });
 }
 
+// To the customer: part or all of a payment was refunded.
+export function refundEmail(d, s, cents, link, siteUrl) {
+  const i = d.invoice, cur = i.currency;
+  const content = `${heading('Your refund is on its way')}
+<p style="margin:0 0 16px;">Hi ${esc(first(d.customer))},</p>
+<p style="margin:0 0 20px;">We refunded <strong>${esc(money(cents, cur))}</strong> from invoice ${esc(i.number)} to your original payment method. It usually shows up within 5 to 10 business days, depending on your bank.</p>
+${summary([['Invoice', esc(i.number)], ['Refunded', esc(money(cents, cur)), true]])}
+<p style="margin:0 0 22px;">${button(link, 'View the invoice')}</p>
+<p style="margin:0 0 24px;font-size:13px;color:${C.muted};">Questions? Just reply to this email.</p>`;
+  return shell({ siteUrl, preheader: `${money(cents, cur)} refunded`, title: 'Refund', content });
+}
+
 // To the team.
 export function paymentNotice(d, paidCents, adminLink, siteUrl, becamePaid) {
   const i = d.invoice, cur = i.currency;
