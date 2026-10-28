@@ -10,6 +10,11 @@ import html, os
 SITE = 'https://everythingshul.com'
 
 PROJECTS = [
+    dict(id='everythingshul', name='Everything Shul', full='Everything Shul — Customers, Billing & Payments', kind='Customer and billing platform', new=True,
+         url='https://everythingshul.com', shown='everythingshul.com',
+         desc='The platform behind this very site: customer records, invoices and quotes, online card payments with refunds, and a private admin where the team answers visitors and sees what is happening.',
+         features=['Customer records, notes and follow-ups', 'Invoices, quotes and repeating billing', 'Online card payments and refunds', 'Reports and exports to Excel'],
+         video=dict(preview='assets/video/everythingshul-preview.mp4', poster='assets/video/everythingshul-poster.jpg', tour='assets/video/everythingshul-tour.mp4')),
     dict(id='drm', name='DRM', full='DRM — Donor Relationship Manager', kind='Donor management',
          url='https://drm.everythingshul.com', shown='drm.everythingshul.com',
          desc='An all-in-one donor CRM built for shuls — live totals, recurring charge batches, follow-ups, Hebrew kvitel generation and templated receipts, all in one dashboard.',
@@ -136,7 +141,8 @@ def chat_scripts():
     return '<script src="js/chat-config.js" defer></script>\n<script src="js/metrics.js" defer></script>\n<script src="js/voice.js" defer></script>\n<script src="js/chat-kb.js" defer></script>\n<script src="js/chat.js" defer></script>\n'
 
 def project_html(i, p):
-    flip = ' flip' if i % 2 else ''
+    num = len(PROJECTS) - i   # numbered from the bottom up, so the newest is on top with the highest number
+    flip = ' flip' if num % 2 else ''
     new = '<span class="new">New</span>' if p.get('new') else ''
     feats = '\n'.join(f'          <li>{e(f)}</li>' for f in p['features'])
     if 'video' in p:
@@ -157,7 +163,7 @@ def project_html(i, p):
     <section class="project{flip}" id="{p['id']}">
       <div class="project-grid">
         <div class="project-text">
-          <p class="kicker"><span class="n">{i+1:02d}</span>{e(p['kind'])}{new}</p>
+          <p class="kicker"><span class="n">{num:02d}</span>{e(p['kind'])}{new}</p>
           <h3>{e(p['name'])}</h3>
           <p>{e(p['desc'])}</p>
           <ul class="features">
@@ -181,7 +187,7 @@ def marquee():
 
 def index_html():
     idx = '\n'.join(
-        f'''      <li><a href="#{p['id']}"><span class="n">{i+1:02d}</span><span class="name">{e(p['name'])}</span><span class="kind">{e(p['kind'])}</span><span class="go" aria-hidden="true">↓</span></a></li>'''
+        f'''      <li><a href="#{p['id']}"><span class="n">{len(PROJECTS) - i:02d}</span><span class="name">{e(p['name'])}</span><span class="kind">{e(p['kind'])}</span><span class="go" aria-hidden="true">↓</span></a></li>'''
         for i, p in enumerate(PROJECTS))
     projects = '\n'.join(project_html(i, p) for i, p in enumerate(PROJECTS))
     title = 'Everything Shul — Custom software for nonprofits'

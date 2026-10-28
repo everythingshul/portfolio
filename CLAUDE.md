@@ -68,6 +68,12 @@ non-profits") — all were explicitly removed per client request. Don't reintrod
 
 ## The showcase products (in `index.html`, `#showcase` section)
 
+0. **Everything Shul** (`everythingshul.com`, this site) is the newest card and sits on top as 07. Cards are numbered from the
+   bottom up (Fundraise Wall 01 ... DRM 06, this site 07), so a new project goes first in PROJECTS and the numbers follow from the
+   list length. The card has a real product tour (`assets/video/everythingshul-*`): a screen recording of the admin (customers,
+   invoices, emails, online payment, refund, overview, terms) with made-up demo data, plus a walk through the live portfolio sites.
+   Chesky knows it (`this_site`, `billing_platform`, `invoice_payments` in tools/kb.py; aliases "this site", "billing platform").
+
 1. **DRM** (`drm.everythingshul.com`) — donor relationship manager / CRM. Has a real product-tour
    video showcase.
 2. **Kipas Hair BP** (`kipashairbp.org`, admin at `ecards.kipashairbp.org`) — gift-card assistance
