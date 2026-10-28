@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   last_reminder_at INTEGER,
   reminders INTEGER NOT NULL DEFAULT 0,
   auto_remind INTEGER NOT NULL DEFAULT 1,
+  online_pay INTEGER NOT NULL DEFAULT 1,      -- 0 = the customer can not pay this one online
   recurring_id TEXT NOT NULL DEFAULT '',
   converted_from TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL DEFAULT '',

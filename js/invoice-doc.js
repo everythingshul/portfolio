@@ -42,7 +42,7 @@
   <footer class="inv-foot">
     ${d.notes ? `<div><div class="inv-label">Notes</div><p>${esc(d.notes)}</p></div>` : ''}
     ${d.terms ? `<div><div class="inv-label">Terms</div><p>${esc(d.terms)}</p></div>` : ''}
-    ${show && pays.length ? `<div class="inv-pays"><h4>Payments received (${pays.length})</h4>${pays.map((p) => `<div class="p"><div class="dt">${esc(day(p.received_at))}</div><div class="row"><span>${esc(METHOD[p.method] || 'Payment')}${p.ref ? ' - ' + esc(p.ref) : ''}</span><span>${esc(money(p.amount_cents, cur))}</span></div></div>`).join('')}</div>` : ''}
+    ${show && pays.length ? `<div class="inv-pays"><h4>Payments received (${pays.length})</h4>${pays.map((p) => `<div class="p"><div class="dt">${esc(day(p.received_at))}</div><div class="row"><span>${esc(METHOD[p.method] || 'Payment')}${p.ref && !['stripe', 'stripe_refund'].includes(p.method) ? ' - ' + esc(p.ref) : ''}</span><span>${esc(money(p.amount_cents, cur))}</span></div></div>`).join('')}</div>` : ''}
   </footer>
   <div class="inv-legal">All transactions and/or interactions with ${esc(b.name)} are subject to our <a href="/terms.html" target="_blank" rel="noopener">terms &amp; conditions</a>.</div>
 </article>`;

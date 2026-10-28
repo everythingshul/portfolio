@@ -20,7 +20,7 @@ import { adminNotification, customerConfirmation, customerReply, digestEmail } f
 import { brevo } from './mail.js';
 import { upsertLead } from './billing.js';
 import { billingAdmin } from './billing-admin.js';
-import { publicInvoice, respondToQuote, createCheckout, stripeWebhook, billingDaily } from './billing-pay.js';
+import { publicInvoice, respondToQuote, createCheckout, createIntent, confirmIntent, stripeWebhook, billingDaily } from './billing-pay.js';
 import { buildXlsx, XLSX_TYPE } from './xlsx.js';
 import { ingest, computeStats, liveStats, recentSessions, sessionTimeline, exportData, resetStats, purgeOld } from './stats.js';
 
@@ -316,6 +316,20 @@ async function invoicePay(request, env, h) {
   try { return json(await createCheckout(env, String(b.t || '')), 200, h); }
   catch (e) { return json({ error: e.status ? e.message : 'Online payment is not available right now. Please contact us.' }, e.status || 500, h); }
 }
+async function invoiceIntent(request, env, h) {
+  if (!env.BILL) return json({ error: 'Not found' }, 404, h);
+  if (await limited(env, request, 'pay', 40)) return json({ error: 'Too many attempts. Please try again later.' }, 429, h);
+  let b; try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
+  try { return json(await createIntent(env, String(b.t || '')), 200, h); }
+  catch (e) { return json({ error: e.status ? e.message : 'Online payment is not available right now. Please contact us.' }, e.status || 500, h); }
+}
+async function invoiceConfirm(request, env, h) {
+  if (!env.BILL) return json({ error: 'Not found' }, 404, h);
+  if (await limited(env, request, 'payconfirm', 120)) return json({ error: 'Too many requests.' }, 429, h);
+  let b; try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
+  try { return json(await confirmIntent(env, String(b.t || ''), String(b.pi || '')), 200, h); }
+  catch (e) { return json({ error: e.status ? e.message : 'Could not check the payment.' }, e.status || 500, h); }
+}
 async function invoiceRespond(request, env, h) {
   if (!env.BILL) return json({ error: 'Not found' }, 404, h);
   if (await limited(env, request, 'qresp', 20)) return json({ error: 'Too many attempts.' }, 429, h);
@@ -487,6 +501,8 @@ export default {
       if (url.pathname === '/t' && request.method === 'POST') return await ingest(request, env, h);
       if (url.pathname === '/i' && request.method === 'GET') return await invoicePage(request, url, env, h);
       if (url.pathname === '/i/pay' && request.method === 'POST') return await invoicePay(request, env, h);
+      if (url.pathname === '/i/intent' && request.method === 'POST') return await invoiceIntent(request, env, h);
+      if (url.pathname === '/i/confirm' && request.method === 'POST') return await invoiceConfirm(request, env, h);
       if (url.pathname === '/i/respond' && request.method === 'POST') return await invoiceRespond(request, env, h);
       return json({ error: 'Not found' }, 404, h);
     } catch (err) {

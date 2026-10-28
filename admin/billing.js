@@ -7,7 +7,7 @@
   const root = () => $('billing');
   let api = null;
   let settings = null;
-  const st = { view: 'overview', inv: { status: '', q: '', from: '', to: '' }, quo: { status: '', q: '' }, pay: { q: '', from: '', to: '', method: '' }, rep: { from: '', to: '' } };
+  const st = { ov: { key: '30d', from: '', to: '' }, view: 'overview', inv: { status: '', q: '', from: '', to: '' }, quo: { status: '', q: '' }, pay: { q: '', from: '', to: '', method: '' }, rep: { from: '', to: '' } };
 
   const VIEWS = [['overview', 'Overview'], ['invoices', 'Invoices'], ['quotes', 'Quotes'], ['recurring', 'Repeating'], ['payments', 'Payments'], ['items', 'Items'], ['reports', 'Reports'], ['import', 'Import'], ['settings', 'Settings']];
   const who = (r) => r.customer_org || r.customer_name || r.org || r.name || '';
@@ -43,33 +43,60 @@
   const VIEW = {};
 
   /* ------------------------------------------------------------------ overview */
+  // The overview. The date range changes the money numbers; what is owed and overdue is always "right now".
+  const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const RANGES = [['30d', '30 days'], ['3m', '3 months'], ['6m', '6 months'], ['12m', '12 months'], ['all', 'All time'], ['custom', 'Custom']];
+  const rangeParams = () => {
+    const o = st.ov; const t = new Date(); const to = ymd(t);
+    const back = (months) => { const f = new Date(t); f.setMonth(f.getMonth() - months); f.setDate(f.getDate() + 1); return ymd(f); };
+    if (o.key === 'all') return { range: 'all' };
+    if (o.key === 'custom' && o.from && o.to) return { from: o.from, to: o.to };
+    if (o.key === '3m') return { from: back(3), to };
+    if (o.key === '6m') return { from: back(6), to };
+    if (o.key === '12m') return { from: back(12), to };
+    const f = new Date(t); f.setDate(f.getDate() - 29); return { from: ymd(f), to };
+  };
+
   VIEW.overview = async (el) => {
-    const d = await api('/admin/b/dashboard');
+    const rp = rangeParams();
+    const d = await api('/admin/b/dashboard?' + new URLSearchParams(rp));
     await loadSettings();
-    const months = [];
-    for (let i = 11; i >= 0; i--) { const t = new Date(); t.setDate(1); t.setMonth(t.getMonth() - i); months.push(t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0')); }
-    const mm = Object.fromEntries(d.monthly.map((m) => [m.m, m.s]));
-    const rows = months.map((m) => ({ m, s: mm[m] || 0 }));
-    const max = Math.max(...rows.map((r) => r.s), 1);
+    // fill the empty days/months so the chart has no gaps
+    const bm = Object.fromEntries(d.buckets.map((x) => [x.k, x.s]));
+    const rows = []; const gran = d.range.granularity;
+    const a0 = new Date(d.range.from + 'T12:00:00'), b0 = new Date(d.range.to + 'T12:00:00');
+    if (gran === 'day') { for (let x = new Date(a0); x <= b0; x.setDate(x.getDate() + 1)) { const k = ymd(x); rows.push({ k, s: bm[k] || 0, label: x.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }); } }
+    else { for (let x = new Date(a0.getFullYear(), a0.getMonth(), 1, 12); x <= b0; x.setMonth(x.getMonth() + 1)) { const k = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'); rows.push({ k, s: bm[k] || 0, label: x.toLocaleDateString('en-US', { month: 'short', year: rows.length && x.getMonth() ? undefined : '2-digit' }) }); } }
+    const shown = rows.length > 60 ? rows.slice(-60) : rows;
+    const max = Math.max(...shown.map((r) => r.s), 1);
     const order = ['current', '1-30', '31-60', '61-90', '90+'];
-    const aging = order.map((k) => ({ k, ...(d.aging.find((a) => a.bucket === k) || { s: 0, n: 0 }) }));
-    const stripeNote = '';
+    const aging = order.map((k) => ({ k, ...(d.aging.find((x) => x.bucket === k) || { s: 0, n: 0 }) }));
+    const niceRange = st.ov.key === 'all' ? 'all time' : `${fmtDate(d.range.from)} to ${fmtDate(d.range.to)}`;
+    const labelEvery = Math.max(1, Math.ceil(shown.length / 12));
     el.innerHTML = `<div class="pagehead"><h2 class="plain">Billing</h2><span class="grow"></span><button class="small-btn" id="o-newq">New quote</button><button class="small-btn primary" id="o-newi">+ New invoice</button></div>
-      <div class="kpis">${kpi('Outstanding', esc(money(d.outstanding.s)), `${d.outstanding.n} unpaid invoice${d.outstanding.n === 1 ? '' : 's'}`)}${kpi('Overdue', esc(money(d.overdue.s)), `${d.overdue.n} invoice${d.overdue.n === 1 ? '' : 's'}`, d.overdue.n ? 'bad' : '')}${kpi('Paid, last 30 days', esc(money(d.paid30.s)), `${d.paid30.n} payment${d.paid30.n === 1 ? '' : 's'}`, 'good')}${kpi('Drafts', String(d.drafts.n), esc(money(d.drafts.s)) + ' not sent yet')}${kpi('Customers', String(d.counts.customers), `${d.counts.leads} lead${d.counts.leads === 1 ? '' : 's'}`)}</div>
-      ${stripeNote}
-      ${card('Money received, last 12 months', `<div class="monthbars">${rows.map((r) => `<div class="mb" title="${esc(r.m)}: ${esc(money(r.s))}"><div class="mbv">${r.s ? esc(money(r.s).replace(/\.00$/, '')) : ''}</div><div class="mbt"><i style="height:${Math.max(r.s ? 3 : 0, (Math.max(0, r.s) / max) * 100)}%"></i></div><div class="mbl">${new Date(r.m + '-15').toLocaleDateString('en-US', { month: 'short' })}</div></div>`).join('')}</div>`, 'wide')}
+      <div class="toolbar"><div class="chips" id="o-range">${RANGES.map(([k, l]) => `<button class="chip${st.ov.key === k ? ' on' : ''}" data-r="${k}">${l}</button>`).join('')}</div>
+        ${st.ov.key === 'custom' ? `<input type="date" id="o-from" value="${esc(st.ov.from || d.range.from)}" aria-label="From"><span class="subtle">to</span><input type="date" id="o-to" value="${esc(st.ov.to || d.range.to)}" aria-label="To"><button class="small-btn" id="o-apply">Apply</button>` : ''}
+        <span class="subtle">Showing ${esc(niceRange)}</span></div>
+      <div class="kpis">${kpi('Received', esc(money(d.received.s)), `${d.received.n} payment${d.received.n === 1 ? '' : 's'}, ${esc(niceRange)}`, 'good')}${kpi('Invoiced', esc(money(d.invoiced.s)), `${d.invoiced.n} invoice${d.invoiced.n === 1 ? '' : 's'}`)}${kpi('Owed right now', esc(money(d.outstanding.s)), `${d.outstanding.n} unpaid invoice${d.outstanding.n === 1 ? '' : 's'}`)}${kpi('Overdue', esc(money(d.overdue.s)), `${d.overdue.n} invoice${d.overdue.n === 1 ? '' : 's'}`, d.overdue.n ? 'bad' : '')}${kpi('Drafts', String(d.drafts.n), esc(money(d.drafts.s)) + ' not sent yet')}${kpi('Customers', String(d.counts.customers), `${d.counts.leads} lead${d.counts.leads === 1 ? '' : 's'}`)}</div>
+      ${card('Money received', shown.length ? `<div class="monthbars" style="grid-template-columns:repeat(${shown.length}, minmax(0, 1fr))">${shown.map((r, i) => `<div class="mb" title="${esc(r.k)}: ${esc(money(r.s))}"><div class="mbv">${shown.length <= 14 && r.s ? esc(money(r.s).replace(/\.00$/, '')) : ''}</div><div class="mbt"><i style="height:${Math.max(r.s ? 3 : 0, (Math.max(0, r.s) / max) * 100)}%"></i></div><div class="mbl">${i % labelEvery === 0 ? esc(r.label) : ''}</div></div>`).join('')}</div>` : '<div class="aempty">No payments in this period.</div>', 'wide', gran === 'day' ? 'One bar per day.' : 'One bar per month.')}
       <div class="grid2">${card('Overdue invoices', d.overdueInvoices.length ? table(['Invoice', 'Customer', 'Due', '>Balance', ''], d.overdueInvoices.map((i) => `<tr data-inv="${esc(i.id)}"><td><strong>${esc(i.number)}</strong></td><td>${esc(who(i))}</td><td>${esc(fmtDate(i.due_date))}</td><td class="n">${esc(money(i.balance, i.currency))}</td><td class="n"><button class="small-btn" data-remind="${esc(i.id)}">Remind</button></td></tr>`), true) : '<div class="aempty">Nothing is overdue. 🎉</div>')}
         ${card('Who owes what, by age', bars(aging, (r) => (r.k === 'current' ? 'Not due yet' : r.k + ' days late'), (r) => r.s, (v) => money(v)))}</div>
-      <div class="grid2">${card('Recent payments', d.recentPayments.length ? table(['Date', 'Customer', 'Invoice', '>Amount'], d.recentPayments.map((p) => `<tr data-inv="${esc(p.invoice_id)}"><td>${esc(U.fmtDay(p.received_at))}</td><td>${esc(who(p))}</td><td>${esc(p.invoice_number || '')}</td><td class="n">${esc(money(p.amount_cents))}</td></tr>`), true) : '<div class="aempty">No payments yet.</div>')}
+      <div class="grid2">${card('Payments in this period', d.recentPayments.length ? table(['Date', 'Customer', 'Invoice', '>Amount'], d.recentPayments.map((p) => `<tr data-inv="${esc(p.invoice_id)}"><td>${esc(U.fmtDay(p.received_at))}</td><td>${esc(who(p))}</td><td>${esc(p.invoice_number || '')}</td><td class="n">${esc(money(p.amount_cents))}</td></tr>`), true) + '<p class="anote"><a href="#" id="all-pay">See all payments</a></p>' : '<div class="aempty">No payments in this period.</div>')}
         ${card('Follow-ups', d.tasks.length ? '<ul class="plainlist">' + d.tasks.map((t) => `<li class="${t.due && t.due < d.today ? 'late' : ''}"><label><input type="checkbox" data-task="${esc(t.id)}"> ${esc(t.text)}</label><a href="#customer=${esc(t.customer_id)}" data-cust="${esc(t.customer_id)}">${esc(t.customer_org || t.customer_name || '')}</a>${t.due ? `<small>${esc(fmtDate(t.due))}</small>` : ''}</li>`).join('') + '</ul>' : '<div class="aempty">No follow-ups due.</div>')}</div>
-      ${d.topCustomers.length ? card('Top customers, last 12 months', bars(d.topCustomers, (r) => r.org || r.name, (r) => r.s, (v) => money(v)), 'wide') : ''}`;
+      ${d.topCustomers.length ? card('Top customers in this period', bars(d.topCustomers, (r) => r.org || r.name, (r) => r.s, (v) => money(v)), 'wide') : ''}`;
     $('o-newi').addEventListener('click', () => invoiceEditor({ kind: 'invoice' }));
     $('o-newq').addEventListener('click', () => invoiceEditor({ kind: 'quote' }));
+    $('o-range').addEventListener('click', (e) => { const b = e.target.closest('[data-r]'); if (!b) return; st.ov.key = b.dataset.r; if (b.dataset.r === 'custom' && !st.ov.from) { st.ov.from = d.range.from; st.ov.to = d.range.to; } draw(); });
+    const ap = $('o-apply'); if (ap) ap.addEventListener('click', () => { const f = $('o-from').value, t = $('o-to').value; if (f && t) { st.ov.from = f; st.ov.to = t; draw(); } });
+    const ap2 = $('all-pay'); if (ap2) ap2.addEventListener('click', (e) => { e.preventDefault(); st.view = 'payments'; chrome(); draw(); });
     el.querySelectorAll('tr[data-inv]').forEach((r) => r.addEventListener('click', (e) => { if (e.target.closest('button')) return; go(r.dataset.inv); }));
     el.querySelectorAll('[data-remind]').forEach((b) => b.addEventListener('click', async () => { b.disabled = true; try { await api('/admin/b/invoice/remind', { method: 'POST', body: { id: b.dataset.remind } }); toast('Reminder sent'); } catch (e) { toast(e.message); } b.disabled = false; }));
     el.querySelectorAll('[data-task]').forEach((cb) => cb.addEventListener('change', async () => { await api('/admin/b/task/toggle', { method: 'POST', body: { id: cb.dataset.task, done: cb.checked } }); draw(); }));
     el.querySelectorAll('[data-cust]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); goCust(a.dataset.cust); }));
-    api('/admin/b/stripe').then((s) => { if (!s.key) el.querySelector('.kpis').insertAdjacentHTML('afterend', `<div class="notice">Online payments are not connected yet, so customers can not pay by card from their invoice. <a href="#" id="to-set">Set up Stripe</a></div>`), $('to-set') && $('to-set').addEventListener('click', (e) => { e.preventDefault(); st.view = 'settings'; chrome(); draw(); }); }).catch(() => {});
+    api('/admin/b/stripe').then((s) => {
+      const msg = !s.key ? 'Online payments are not connected yet, so customers can not pay by card from their invoice.' : (!s.publishable_key ? 'Customers are sent to Stripe\'s page to pay. Add your Stripe publishable key to let them pay right on the invoice page.' : '');
+      if (msg) { el.querySelector('.kpis').insertAdjacentHTML('afterend', `<div class="notice">${esc(msg)} <a href="#" id="to-set">Open settings</a></div>`); const l = $('to-set'); if (l) l.addEventListener('click', (e) => { e.preventDefault(); st.view = 'settings'; chrome(); draw(); }); }
+    }).catch(() => {});
   };
 
   /* ------------------------------------------------------------------ invoices and quotes list */
@@ -139,8 +166,9 @@
     el.innerHTML = `<div class="pagehead no-print"><button class="small-btn" id="back">← ${q ? 'Quotes' : 'Invoices'}</button><div class="titleblock"><h2>${q ? 'Quote' : 'Invoice'} ${esc(i.number)}</h2>${badge(i.state)}</div><span class="grow"></span><a href="#customer=${esc(c.id)}" class="small-btn" id="tocust">${esc(c.org || c.name)} →</a></div>
       <div class="split inv-split"><div class="main"><div class="docwrap">${Doc.render(docData(d, s))}</div></div>
       <aside class="side no-print"><section class="acard"><h3>Actions</h3><div class="actions-col">${a.join('')}</div></section>
-        ${!q && i.status !== 'draft' && i.status !== 'void' ? `<section class="acard"><h3>Payments</h3>${d.payments.length ? d.payments.map((p) => `<div class="line"><span>${esc(U.fmtDay(p.received_at))} · ${esc(methodName(p.method))}${p.ref ? ` <small>${esc(p.ref)}</small>` : ''}</span><span class="pr"><strong>${esc(money(p.amount_cents, i.currency))}</strong>${p.method === 'stripe' || p.method === 'stripe_refund' ? '' : `<button class="x" data-delpay="${esc(p.id)}" aria-label="Remove payment" title="Remove this payment record">×</button>`}</span></div>`).join('') : '<div class="subtle">No payments yet.</div>'}
+        ${!q && i.status !== 'draft' && i.status !== 'void' ? `<section class="acard"><h3>Payments</h3>${d.payments.length ? d.payments.map((p) => { const back = d.payments.filter((x) => x.method === 'stripe_refund' && x.ref && x.ref === p.ref).reduce((a, x) => a - x.amount_cents, 0); const left = p.amount_cents - back; return `<div class="line"><span>${esc(U.fmtDay(p.received_at))} · ${esc(methodName(p.method))}${p.ref && p.method !== 'stripe' && p.method !== 'stripe_refund' ? ` <small>${esc(p.ref)}</small>` : ''}</span><span class="pr"><strong>${esc(money(p.amount_cents, i.currency))}</strong>${p.method === 'stripe' && left > 0 ? `<button class="small-btn" data-refund="${esc(p.id)}" data-left="${left}" title="Send money back to the customer's card">Refund</button>` : ''}${p.method === 'stripe' || p.method === 'stripe_refund' ? '' : `<button class="x" data-delpay="${esc(p.id)}" aria-label="Remove payment" title="Remove this payment record">×</button>`}</span></div>`; }).join('') : '<div class="subtle">No payments yet.</div>'}
           <label class="check pad"><input type="checkbox" id="autorem" ${i.auto_remind ? 'checked' : ''}> Send automatic reminders</label></section>` : ''}
+        ${!q && i.status !== 'void' ? `<section class="acard"><h3>Online payment</h3><label class="check pad"><input type="checkbox" id="onlinepay" ${i.online_pay === 0 ? '' : 'checked'}> The customer can pay this invoice online (card or bank, through Stripe)</label><p class="anote">${i.online_pay === 0 ? 'Online payment is off for this invoice: the customer sees it but there is no Pay button. Record checks or cash yourself.' : 'Turn this off for an invoice that should be paid another way.'}</p></section>` : ''}
         <section class="acard"><h3>History</h3>${d.activity.length ? `<ul class="timeline">${d.activity.map((x) => `<li><time>${esc(U.fmtTime(x.ts))}</time><span>${esc(x.text)}</span></li>`).join('')}</ul>` : '<div class="subtle">Nothing yet.</div>'}</section></aside></div>`;
     $('back').addEventListener('click', () => { history.replaceState(null, '', '#billing'); st.view = q ? 'quotes' : 'invoices'; chrome(); draw(); });
     $('tocust').addEventListener('click', (e) => { e.preventDefault(); goCust(c.id); });
@@ -161,6 +189,8 @@
     };
     el.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', async () => { try { await act[b.dataset.a](); } catch (e) { toast(e.message); } }));
     el.querySelectorAll('[data-delpay]').forEach((b) => b.addEventListener('click', async () => { if (await U.ask('Remove this payment record?', 'The invoice balance goes back up.', 'Remove', true)) { try { await api('/admin/b/payment/delete', { method: 'POST', body: { id: b.dataset.delpay } }); openInvoice(id); } catch (e) { toast(e.message); } } }));
+    const op = $('onlinepay'); if (op) op.addEventListener('change', async () => { try { await api('/admin/b/invoice/online-pay', { method: 'POST', body: { id, on: op.checked } }); toast(op.checked ? 'Customer can pay online' : 'Online payment turned off for this invoice'); openInvoice(id); } catch (e) { toast(e.message); op.checked = !op.checked; } });
+    el.querySelectorAll('[data-refund]').forEach((b) => b.addEventListener('click', () => refundForm(d, b.dataset.refund, +b.dataset.left, () => openInvoice(id))));
     const ar = $('autorem'); if (ar) ar.addEventListener('change', () => api('/admin/b/invoice/auto-remind', { method: 'POST', body: { id, on: ar.checked } }).then(() => toast(ar.checked ? 'Automatic reminders on' : 'Automatic reminders off')));
   }
 
@@ -171,6 +201,25 @@
     if (!ok) return;
     const r = await api('/admin/b/invoice/send', { method: 'POST', body: { id: i.id } });
     toast(`Sent to ${r.to}`); done && done();
+  }
+
+  // Sends money back to the customer's card through Stripe, and records it on the invoice.
+  function refundForm(d, paymentId, left, done) {
+    const i = d.invoice, c = d.customer;
+    const m = U.modal('Refund a payment', `<form id="rform2" class="cform"><p class="modal-text">This sends the money back to the customer's card through Stripe. It can not be undone. You can refund up to <strong>${esc(money(left, i.currency))}</strong>.</p>
+      <div class="grid2"><label class="f"><span>Amount to refund</span><input name="amount" inputmode="decimal" value="${esc(dollars(left))}" required></label>
+      <label class="f"><span>Reason</span><select name="reason"><option value="requested_by_customer">Customer asked for it</option><option value="duplicate">Charged twice</option><option value="fraudulent">Fraud</option><option value="">Other</option></select></label></div>
+      <label class="f"><span>Note (only you see this)</span><input name="note" maxlength="300"></label>
+      <label class="check pad"><input type="checkbox" name="notify" ${c.email ? 'checked' : 'disabled'}> Email ${esc(c.email || 'the customer (no email on file)')} to say it was refunded</label>
+      <p class="form-err" role="alert"></p><div class="modal-actions"><button type="button" class="small-btn" data-cancel>Cancel</button><button class="small-btn danger solid" type="submit">Refund</button></div></form>`);
+    m.el.querySelector('[data-cancel]').addEventListener('click', m.close);
+    m.el.querySelector('#rform2').addEventListener('submit', async (e) => {
+      e.preventDefault(); const fd = new FormData(e.target); const cents = toCents(fd.get('amount'));
+      if (!cents || cents <= 0) { m.el.querySelector('.form-err').textContent = 'Enter an amount.'; return; }
+      const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Refunding…';
+      try { const r = await api('/admin/b/payment/refund', { method: 'POST', body: { id: paymentId, amount_cents: cents, reason: fd.get('reason'), note: fd.get('note'), notify: !!fd.get('notify') } }); m.close(); toast(`Refunded ${money(r.refunded, i.currency)}${r.emailed ? ' and emailed the customer' : ''}`); done && done(); }
+      catch (x) { m.el.querySelector('.form-err').textContent = x.message; btn.disabled = false; btn.textContent = 'Refund'; }
+    });
   }
 
   function paymentForm(d, done) {
@@ -273,7 +322,8 @@
             <label class="f"><span>Discount</span><div class="inline"><input name="discount_value" id="ie-dv" inputmode="decimal" value="${cur.discount_value ? esc(String(cur.discount_value)) : ''}" placeholder="0"><select name="discount_type" id="ie-dt"><option value="pct"${cur.discount_type === 'pct' ? ' selected' : ''}>%</option><option value="amt"${cur.discount_type === 'amt' ? ' selected' : ''}>$</option></select></div></label>
             <label class="f"><span>Tax rate (%) on taxable items</span><input name="tax_rate" id="ie-tax" inputmode="decimal" value="${esc(String(cur.tax_rate || 0))}"></label></div>
             <label class="f"><span>Message to the customer (shown on the ${q ? 'quote' : 'invoice'})</span><textarea name="notes" rows="3" maxlength="1500">${esc(cur.notes || '')}</textarea></label>
-            <label class="f"><span>Terms</span><textarea name="terms" rows="2" maxlength="1500">${esc(cur.terms || '')}</textarea></label></section>
+            <label class="f"><span>Terms</span><textarea name="terms" rows="2" maxlength="1500">${esc(cur.terms || '')}</textarea></label>
+            ${q ? '' : `<label class="check pad"><input type="checkbox" name="online_pay" ${cur.online_pay === 0 ? '' : 'checked'}> Let the customer pay this online (card or bank, through Stripe)</label>`}</section>
           <section class="acard totalsbox"><h3>Summary</h3><div id="ie-totals"></div></section></div>
         <p class="form-err" id="ie-err" role="alert"></p>
         <div class="row sticky"><button type="submit" class="small-btn" data-mode="save">Save${existing ? '' : ' as draft'}</button><button type="submit" class="small-btn primary" data-mode="send">${existing && existing.status !== 'draft' ? 'Save and resend' : 'Save and send'}</button></div></form>`;
@@ -308,7 +358,7 @@
       $('ie-err').textContent = '';
       if (!f.customer_id) { $('ie-err').textContent = 'Choose a customer.'; return; }
       const body = { id: existing && existing.id, kind: cur.kind, title: f.title, customer_id: f.customer_id, issue_date: f.issue_date, due_date: f.due_date, lines: lines.get(), discount_type: f.discount_type,
-        discount_value: f.discount_type === 'pct' ? Number(f.discount_value) || 0 : toCents(f.discount_value) || 0, tax_rate: Number(f.tax_rate) || 0, notes: f.notes, terms: f.terms, currency: cur.currency, send: mode === 'send' };
+        discount_value: f.discount_type === 'pct' ? Number(f.discount_value) || 0 : toCents(f.discount_value) || 0, tax_rate: Number(f.tax_rate) || 0, notes: f.notes, terms: f.terms, currency: cur.currency, online_pay: q ? undefined : !!f.online_pay, send: mode === 'send' };
       el.querySelectorAll('button[type=submit]').forEach((b) => { b.disabled = true; });
       try {
         const r = await api('/admin/b/invoice/save', { method: 'POST', body });
@@ -528,14 +578,18 @@
     const s2 = await api('/admin/b/stripe').catch(() => ({ key: false }));
     const step = (n, t) => `<li>${t}</li>`;
     box.innerHTML = `${s2.key ? `<div class="notice ${s2.error ? 'bad' : 'good'}">${s2.error ? 'Stripe says: ' + esc(s2.error) : `Connected to Stripe${s2.account ? ': <strong>' + esc(s2.account) + '</strong>' : ''} in <strong>${esc(s2.mode)} mode</strong>${s2.mode === 'test' ? ' (test cards only, no real money)' : ''}.${s2.charges_enabled === false ? ' This Stripe account can not take payments yet; finish setting it up in Stripe.' : ''}`}</div>` : '<div class="notice">Not connected yet. Customers can still see their invoices, but they can not pay online.</div>'}
-      ${s2.key && !s2.webhook_secret ? '<div class="notice bad">The webhook secret is missing, so payments will not be recorded automatically. See step 3 below.</div>' : ''}
+      ${s2.key && !s2.webhook_secret ? '<div class="notice bad">The webhook secret is missing, so payments from Stripe will not be recorded if the customer closes the page too early. See step 4 below.</div>' : ''}
+      ${s2.key ? `<div class="notice ${s2.publishable_key ? 'good' : ''}">${s2.publishable_key ? 'Customers pay right on the invoice page.' : 'No publishable key yet, so customers are sent to Stripe\'s own page to pay. Add the key in step 3 to let them pay on the invoice page itself.'}</div>` : ''}
       <ol class="steps2">
-        <li><strong>Create your Stripe account</strong> at stripe.com and finish the business details. Use the "Test mode" switch while you try it out.</li>
-        <li><strong>Add the secret key.</strong> In Stripe, go to Developers → API keys and copy the <em>Secret key</em> (or make a Restricted key that can write Checkout Sessions and read the Account). Then in Cloudflare: Workers &amp; Pages → <em>everythingshul-chat</em> → Settings → Variables and Secrets → Add → type <em>Secret</em>, name <code>STRIPE_SECRET_KEY</code>.</li>
-        <li><strong>Tell Stripe where to report payments.</strong> In Stripe go to Developers → Webhooks → Add endpoint. Endpoint URL: <code class="copy" id="hook">${esc(hook)}</code> <button type="button" class="small-btn" id="copy-hook">Copy</button><br>Select these events: <code>checkout.session.completed</code>, <code>checkout.session.async_payment_succeeded</code>, <code>checkout.session.async_payment_failed</code>, <code>charge.refunded</code>. Save, then reveal the <em>Signing secret</em> (starts with <code>whsec_</code>) and add it in Cloudflare the same way as <code>STRIPE_WEBHOOK_SECRET</code>.</li>
-        <li><strong>Test it.</strong> Send yourself an invoice, open it, press Pay and use the test card 4242 4242 4242 4242 with any future date and any CVC. The invoice should flip to Paid within seconds.</li>
-        <li>When you are ready for real money, switch Stripe to live mode, replace both secrets with the live ones, and add the webhook again in live mode.</li></ol>
-      <p class="anote">Never paste these keys into a chat or an email. They go straight into Cloudflare. Card details are handled entirely by Stripe and never touch this site.</p>`;
+        <li><strong>Create your Stripe account</strong> at stripe.com and finish the business details. Use the "Test mode" switch while you try it out. Turn on the payment methods you want (cards, and bank debit if you like) under Settings → Payment methods.</li>
+        <li><strong>Add the secret key.</strong> In Stripe, go to Developers → API keys and copy the <em>Secret key</em>. Then in Cloudflare: Workers &amp; Pages → <em>everythingshul-chat</em> → Settings → Variables and Secrets → Add → type <em>Secret</em>, name <code>STRIPE_SECRET_KEY</code>.</li>
+        <li><strong>Paste the publishable key here.</strong> On the same Stripe page, copy the <em>Publishable key</em> (starts with <code>pk_</code>). It is not secret.
+          <div class="inline" style="margin-top:8px;max-width:520px"><input id="stripe-pk" placeholder="pk_test_… or pk_live_…" value="${esc(settings.stripe_pk || '')}" autocomplete="off"><button type="button" class="small-btn primary" id="save-pk">Save</button></div></li>
+        <li><strong>Tell Stripe where to report payments.</strong> In Stripe go to Developers → Webhooks → Add endpoint. Endpoint URL: <code class="copy" id="hook">${esc(hook)}</code> <button type="button" class="small-btn" id="copy-hook">Copy</button><br>Select these events: <code>payment_intent.succeeded</code>, <code>payment_intent.payment_failed</code>, <code>charge.refunded</code>. Save, then reveal the <em>Signing secret</em> (starts with <code>whsec_</code>) and add it in Cloudflare the same way as <code>STRIPE_WEBHOOK_SECRET</code>. (If you already added the older <code>checkout.session…</code> events, keep them.)</li>
+        <li><strong>Test it.</strong> Send yourself an invoice, open it, and pay with the test card 4242 4242 4242 4242, any future date, any CVC. The invoice should show Paid within seconds. You can refund it from the invoice page.</li>
+        <li>When you are ready for real money, switch Stripe to live mode, replace the secrets and the publishable key with the live ones, and add the webhook again in live mode.</li></ol>
+      <p class="anote">Never paste secret keys into a chat or an email. They go straight into Cloudflare. Card details are typed into Stripe's own secure fields and never touch this site.</p>`;
+    const spk = $('save-pk'); if (spk) spk.addEventListener('click', async () => { try { settings = (await api('/admin/b/settings', { method: 'POST', body: { stripe_pk: $('stripe-pk').value.trim() } })).settings; toast(settings.stripe_pk ? 'Publishable key saved' : 'Publishable key removed'); VIEW.settings($('b-body')); } catch (x) { toast(x.message); } });
     const ch = $('copy-hook'); if (ch) ch.addEventListener('click', async () => { try { await navigator.clipboard.writeText(hook); toast('Copied'); } catch (e) { toast('Select and copy the address'); } });
   };
 

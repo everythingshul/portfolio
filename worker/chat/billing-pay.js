@@ -2,7 +2,7 @@
 // (recurring invoices and payment reminders).
 import { brevo } from './mail.js';
 import { fail, getInvoice, getSettings, refreshPaid, addPayment, logAct, listRecurring, runRecurring, addDays, todayStr, money, line1, clean } from './billing.js';
-import { invoiceEmail, invoiceSubject, receiptEmail, paymentNotice, quoteResponseNotice } from './billing-emails.js';
+import { invoiceEmail, invoiceSubject, receiptEmail, paymentNotice, quoteResponseNotice, refundEmail } from './billing-emails.js';
 
 export const payLink = (env, inv) => `${env.SITE_URL}/pay/?t=${inv.token}`;
 const adminLink = (env, inv) => `${env.SITE_URL}/admin/#invoice=${inv.id}`;
@@ -50,6 +50,7 @@ export async function publicInvoice(env, token) {
     ]);
   }
   const i = d.invoice, c = d.customer;
+  const payable = !!env.STRIPE_SECRET_KEY && i.online_pay !== 0 && i.kind === 'invoice' && i.status === 'sent' && i.balance >= 50;
   return {
     kind: i.kind, number: i.number, title: i.title || '', state: i.state, status: i.status, issue_date: i.issue_date, due_date: i.due_date, currency: i.currency,
     lines: d.lines, subtotal: i.subtotal, discount_cents: i.discount_cents, discount_type: i.discount_type, discount_value: i.discount_value,
@@ -57,7 +58,11 @@ export async function publicInvoice(env, token) {
     customer: { name: c.name, org: c.org, email: c.email, phone: c.phone, addr1: c.addr1, addr2: c.addr2, city: c.city, state: c.state, zip: c.zip, country: c.country },
     business: { name: s.biz_name, address: s.biz_address, email: s.biz_email, phone: s.biz_phone, taxid: s.biz_taxid, logo_url: s.logo_url, website: String(env.SITE_URL || '').replace(/^https?:\/\//, '') },
     payments: d.payments.map((p) => ({ amount_cents: p.amount_cents, received_at: p.received_at, method: p.method, ref: p.method === 'stripe' ? '' : p.ref })),
-    can_pay: !!env.STRIPE_SECRET_KEY && i.kind === 'invoice' && i.status === 'sent' && i.balance >= 50,
+    can_pay: payable,
+    // 'embedded' = the card form sits on this page (needs the publishable key); 'redirect' = Stripe's hosted page
+    pay_mode: payable ? (s.stripe_pk ? 'embedded' : 'redirect') : '',
+    stripe_pk: payable ? s.stripe_pk : '',
+    online_pay_off: i.kind === 'invoice' && i.online_pay === 0,
   };
 }
 
@@ -105,7 +110,7 @@ export async function createCheckout(env, token) {
   if (!row) throw fail('Not found', 404);
   const d = await getInvoice(env, row.id);
   const i = d.invoice;
-  if (i.kind !== 'invoice' || i.status !== 'sent') throw fail('This invoice can not be paid online.');
+  if (i.kind !== 'invoice' || i.status !== 'sent' || i.online_pay === 0) throw fail('This invoice can not be paid online. Please contact us.');
   if (i.balance < 50) throw fail('The balance is too small to pay online. Please contact us.');
   const s = await getSettings(env);
   const session = await stripe(env, '/checkout/sessions', {
@@ -121,8 +126,84 @@ export async function createCheckout(env, token) {
   return { url: session.url };
 }
 
+// ---- paying on this site (Stripe Payment Element) ----
+async function payableInvoice(env, token) {
+  const row = await db(env).prepare('SELECT id FROM invoices WHERE token = ?').bind(token || '').first();
+  if (!row) throw fail('Not found', 404);
+  const d = await getInvoice(env, row.id);
+  const i = d.invoice;
+  if (i.kind !== 'invoice' || i.status !== 'sent' || i.online_pay === 0) throw fail('This invoice can not be paid online. Please contact us.');
+  if (i.balance < 50) throw fail('The balance is too small to pay online. Please contact us.');
+  return d;
+}
+
+// Starts a payment for the full balance. The card details never touch our server: Stripe's own fields on the page collect them.
+export async function createIntent(env, token) {
+  const d = await payableInvoice(env, token);
+  const i = d.invoice;
+  const s = await getSettings(env);
+  if (!s.stripe_pk) throw fail('Card payment on this page is not set up yet.', 503);
+  const pi = await stripe(env, '/payment_intents', {
+    amount: i.balance, currency: i.currency, automatic_payment_methods: { enabled: true },
+    description: `Invoice ${i.number}`, receipt_email: d.customer.email || undefined,
+    metadata: { invoice_id: i.id, invoice_number: i.number },
+  });
+  return { client_secret: pi.client_secret, id: pi.id, amount: i.balance, pk: s.stripe_pk };
+}
+
+export async function recordIntent(env, pi, when) {
+  const invoiceId = pi && pi.metadata && pi.metadata.invoice_id;
+  if (!invoiceId || pi.status !== 'succeeded') return null;
+  const amount = pi.amount_received || pi.amount;
+  const res = await addPayment(env, { invoice_id: invoiceId, amount_cents: amount, method: 'stripe', ref: pi.id, stripe_ref: 'pi:' + pi.id, received_at: when || Date.now() });
+  if (res) await afterPayment(env, invoiceId, amount, res.becamePaid);
+  return res;
+}
+
+// The page asks us to check a payment right after Stripe confirms it, so the invoice shows Paid straight away (the webhook is the backup).
+export async function confirmIntent(env, token, piId) {
+  if (!/^pi_[A-Za-z0-9_]+$/.test(piId || '')) throw fail('Invalid payment.');
+  const row = await db(env).prepare('SELECT id FROM invoices WHERE token = ?').bind(token || '').first();
+  if (!row) throw fail('Not found', 404);
+  const pi = await stripe(env, '/payment_intents/' + piId);
+  if (!pi.metadata || pi.metadata.invoice_id !== row.id) throw fail('That payment belongs to a different invoice.', 400);
+  if (pi.status === 'succeeded') await recordIntent(env, pi);
+  const d = await getInvoice(env, row.id);
+  return { status: pi.status, state: d.invoice.state, balance: d.invoice.balance };
+}
+
+// ---- refunds, from the admin page ----
+export async function refundPayment(env, paymentId, o) {
+  o = o || {};
+  const p = await db(env).prepare('SELECT * FROM payments WHERE id = ?').bind(paymentId).first();
+  if (!p || p.method !== 'stripe') throw fail('Only online (Stripe) payments can be refunded here. For a check or cash, record a negative payment instead.');
+  const pi = p.stripe_ref && p.stripe_ref.startsWith('pi:') ? p.stripe_ref.slice(3) : /^pi_/.test(p.ref || '') ? p.ref : '';
+  if (!pi) throw fail('This payment has no Stripe reference, so it can not be refunded here. Record a negative payment instead.');
+  const done = (await db(env).prepare(`SELECT COALESCE(SUM(-amount_cents), 0) AS s FROM payments WHERE method = 'stripe_refund' AND invoice_id = ? AND ref = ?`).bind(p.invoice_id, pi).first()).s;
+  const max = p.amount_cents - done;
+  const amount = Math.round(Number(o.amount_cents) || max);
+  if (max <= 0) throw fail('This payment has already been refunded in full.');
+  if (amount <= 0 || amount > max) throw fail(`You can refund up to ${money(max)} of this payment.`);
+  const reason = ['requested_by_customer', 'duplicate', 'fraudulent'].includes(o.reason) ? o.reason : undefined;
+  const refund = await stripe(env, '/refunds', { payment_intent: pi, amount, reason, metadata: { invoice_id: p.invoice_id, source: 'admin' } });
+  // Same marker the webhook uses (running total refunded for this payment), so the webhook's later "charge.refunded" adds nothing twice.
+  const res = await addPayment(env, { invoice_id: p.invoice_id, amount_cents: -amount, method: 'stripe_refund', ref: pi, stripe_ref: `refund:${pi}:${done + amount}`, note: clean(o.note, 300) || (refund.id ? `Stripe refund ${refund.id}` : '') });
+  let emailed = false;
+  if (o.notify) {
+    try {
+      const d = await getInvoice(env, p.invoice_id); const s = await getSettings(env);
+      if (d.customer.email) {
+        await brevo(env, { to: [{ email: d.customer.email, name: d.customer.name }], replyTo: { email: s.biz_email, name: s.biz_name }, bcc: [{ email: env.ADMIN_EMAIL }],
+          subject: `Refund for invoice ${d.invoice.number}: ${money(amount, d.invoice.currency)}`, htmlContent: refundEmail(d, s, amount, payLink(env, d.invoice), env.SITE_URL) });
+        emailed = true;
+      }
+    } catch (e) { console.error('refund email', e.message); }
+  }
+  return { ok: true, refunded: amount, remaining: max - amount, emailed, status: refund.status || '' };
+}
+
 export async function stripeStatus(env) {
-  const out = { key: !!env.STRIPE_SECRET_KEY, webhook_secret: !!env.STRIPE_WEBHOOK_SECRET, mode: '', account: '', charges_enabled: null, error: '' };
+  const out = { key: !!env.STRIPE_SECRET_KEY, publishable_key: !!(await getSettings(env)).stripe_pk, webhook_secret: !!env.STRIPE_WEBHOOK_SECRET, mode: '', account: '', charges_enabled: null, error: '' };
   if (!out.key) return out;
   out.mode = /_live_/.test(env.STRIPE_SECRET_KEY) ? 'live' : 'test';
   try {
@@ -165,7 +246,13 @@ export async function stripeWebhook(request, env) {
   const o = ev.data && ev.data.object;
   if (!o) return new Response('ok');
   try {
-    if (ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded') {
+    if (ev.type === 'payment_intent.succeeded') {
+      await recordIntent(env, o, (ev.created || Math.floor(Date.now() / 1000)) * 1000);
+    } else if (ev.type === 'payment_intent.payment_failed') {
+      const invoiceId = o.metadata && o.metadata.invoice_id;
+      const inv = invoiceId && await db(env).prepare('SELECT customer_id, number FROM invoices WHERE id = ?').bind(invoiceId).first();
+      if (inv) await logAct(env, { customer_id: inv.customer_id, invoice_id: invoiceId, type: 'payment', text: `A payment attempt for invoice ${inv.number} failed${o.last_payment_error && o.last_payment_error.message ? ': ' + o.last_payment_error.message : ''}` }).run();
+    } else if (ev.type === 'checkout.session.completed' || ev.type === 'checkout.session.async_payment_succeeded') {
       const invoiceId = o.client_reference_id || (o.metadata && o.metadata.invoice_id);
       if (!invoiceId) return new Response('ok');
       if (o.payment_status === 'paid') {

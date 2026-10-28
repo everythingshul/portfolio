@@ -39,7 +39,7 @@ export const fail = (message, status = 400) => Object.assign(new Error(message),
 export const DEFAULTS = {
   biz_name: 'Everything Shul', biz_address: '', biz_email: '', biz_phone: '', biz_taxid: '', logo_url: '',
   invoice_prefix: 'INV-', quote_prefix: 'Q-', next_invoice: '1001', next_quote: '1001',
-  invoice_pad: '0', terms_days: '30', quote_days: '30', tax_rate: '0', notes: '', terms: '', currency: 'usd', reminders: '1',
+  stripe_pk: '', invoice_pad: '0', terms_days: '30', quote_days: '30', tax_rate: '0', notes: '', terms: '', currency: 'usd', reminders: '1',
 };
 const TEXT_LIMITS = { biz_name: 120, biz_address: 400, biz_email: 200, biz_phone: 60, biz_taxid: 60, logo_url: 500, invoice_prefix: 12, quote_prefix: 12, notes: 1500, terms: 1500, currency: 3 };
 
@@ -60,6 +60,7 @@ export async function saveSettings(env, b) {
     if (['next_invoice', 'next_quote'].includes(k)) v = String(int(v, 1, 99999999));
     else if (['terms_days', 'quote_days'].includes(k)) v = String(int(v, 0, 365));
     else if (k === 'invoice_pad') v = String(int(v, 0, 12));
+    else if (k === 'stripe_pk') { v = clean(v, 200); if (v && !/^pk_(live|test)_[A-Za-z0-9]+$/.test(v)) throw fail('That does not look like a Stripe publishable key. It starts with pk_live_ or pk_test_.'); }
     else if (k === 'tax_rate') v = String(Math.max(0, Math.min(100, Number(v) || 0)));
     else if (k === 'reminders') v = v === true || v === '1' || v === 1 ? '1' : '0';
     else if (k === 'currency') { v = clean(v, 3).toLowerCase(); if (!/^[a-z]{3}$/.test(v)) v = 'usd'; }
@@ -267,6 +268,7 @@ export async function saveInvoice(env, b) {
   if (t.total > 1e10) throw fail('That total is too large.');
   const currency = /^[a-z]{3}$/i.test(b.currency || '') ? b.currency.toLowerCase() : settings.currency;
   const notes = clean(b.notes, 1500), terms = clean(b.terms, 1500), title = line1(b.title, 160);
+  const onlinePay = b.online_pay === false || b.online_pay === 0 ? 0 : 1;
   const now = Date.now();
   let id = b.id;
   const stmts = [];
@@ -275,16 +277,16 @@ export async function saveInvoice(env, b) {
     if (!cur) throw fail('Not found', 404);
     if (cur.status === 'void') throw fail('A voided invoice can not be changed.');
     if (cur.kind === 'quote' && cur.status === 'accepted') throw fail('An accepted quote can not be changed.');
-    stmts.push(st(env, `UPDATE invoices SET customer_id=?, issue_date=?, due_date=?, currency=?, subtotal=?, discount_type=?, discount_value=?, discount_cents=?, tax_rate=?, tax_cents=?, total=?, notes=?, terms=?, title=?, updated=? WHERE id=?`,
-      customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, title, now, id));
+    stmts.push(st(env, `UPDATE invoices SET customer_id=?, issue_date=?, due_date=?, currency=?, subtotal=?, discount_type=?, discount_value=?, discount_cents=?, tax_rate=?, tax_cents=?, total=?, notes=?, terms=?, title=?, online_pay=CASE WHEN ? IS NULL THEN online_pay ELSE ? END, updated=? WHERE id=?`,
+      customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, title, b.online_pay == null ? null : onlinePay, onlinePay, now, id));
     stmts.push(st(env, 'DELETE FROM invoice_lines WHERE invoice_id = ?', id));
     stmts.push(logAct(env, { customer_id: customer.id, invoice_id: id, type: kind, text: `${kind === 'quote' ? 'Quote' : 'Invoice'} ${cur.number} edited` }));
   } else {
     id = uid();
     const number = b.number ? line1(b.number, 30) : await nextNumber(env, kind);
-    stmts.push(st(env, `INSERT INTO invoices (id, kind, number, customer_id, status, issue_date, due_date, currency, subtotal, discount_type, discount_value, discount_cents, tax_rate, tax_cents, total, paid, notes, terms, title, token, source, created, updated)
-                        VALUES (?,?,?,?, 'draft', ?,?,?,?,?,?,?,?,?,?, 0, ?,?,?,?, ?,?,?)`,
-      id, kind, number, customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, title, secretToken(), clean(b.source, 40), now, now));
+    stmts.push(st(env, `INSERT INTO invoices (id, kind, number, customer_id, status, issue_date, due_date, currency, subtotal, discount_type, discount_value, discount_cents, tax_rate, tax_cents, total, paid, notes, terms, title, online_pay, token, source, created, updated)
+                        VALUES (?,?,?,?, 'draft', ?,?,?,?,?,?,?,?,?,?, 0, ?,?,?,?,?, ?,?,?)`,
+      id, kind, number, customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, title, onlinePay, secretToken(), clean(b.source, 40), now, now));
     stmts.push(logAct(env, { customer_id: customer.id, invoice_id: id, type: kind, text: `${kind === 'quote' ? 'Quote' : 'Invoice'} ${number} created as a draft` }));
   }
   lines.forEach((l, i) => stmts.push(st(env, 'INSERT INTO invoice_lines (invoice_id, pos, description, qty, unit_cents, taxable) VALUES (?,?,?,?,?,?)', id, i, l.description, l.qty, l.unit_cents, l.taxable)));
@@ -462,23 +464,39 @@ export async function runRecurring(env, r, sendFn) {
 }
 
 /* ------------------------------------------------------------------ dashboard and reports */
-export async function dashboard(env) {
+// The overview. Money received, invoiced, top customers and recent payments follow the chosen date range;
+// what is owed, overdue, drafts and follow-ups are always "right now".
+export async function dashboard(env, p) {
+  p = p || {};
   const today = todayStr();
   const open = `kind = 'invoice' AND status = 'sent' AND paid < total`;
-  const [out, over, drafts, paid30, monthly, aging, recentPay, tasks, overdueList, top, counts] = await Promise.all([
+  let to = validDate(p.to) ? p.to : today;
+  let from;
+  if (p.range === 'all') {
+    const first = await one(env, 'SELECT MIN(received_at) AS t FROM payments');
+    const first2 = await one(env, `SELECT MIN(issue_date) AS d FROM invoices WHERE kind = 'invoice' AND status IN ('sent','paid')`);
+    from = [first && first.t ? new Date(first.t).toISOString().slice(0, 10) : '', first2 && first2.d].filter(Boolean).sort()[0] || addDays(today, -29);
+  } else from = validDate(p.from) ? p.from : addDays(today, -29);
+  if (from > to) [from, to] = [to, from];
+  const f = Date.parse(from + 'T00:00:00Z'), t = Date.parse(to + 'T00:00:00Z') + 86400000;
+  const days = Math.round((t - f) / 86400000);
+  const gran = days <= 62 ? 'day' : 'month';
+  const fmt = gran === 'day' ? '%Y-%m-%d' : '%Y-%m';
+  const [out, over, drafts, received, invoiced, buckets, aging, recentPay, tasks, overdueList, top, counts] = await Promise.all([
     one(env, `SELECT COALESCE(SUM(total - paid),0) AS s, COUNT(*) AS n FROM invoices WHERE ${open}`),
     one(env, `SELECT COALESCE(SUM(total - paid),0) AS s, COUNT(*) AS n FROM invoices WHERE ${open} AND due_date != '' AND due_date < ?`, today),
     one(env, `SELECT COUNT(*) AS n, COALESCE(SUM(total),0) AS s FROM invoices WHERE kind = 'invoice' AND status = 'draft'`),
-    one(env, 'SELECT COALESCE(SUM(amount_cents),0) AS s, COUNT(*) AS n FROM payments WHERE received_at >= ?', Date.now() - 30 * 86400000),
-    all(env, `SELECT strftime('%Y-%m', received_at / 1000, 'unixepoch') AS m, SUM(amount_cents) AS s FROM payments WHERE received_at >= ? GROUP BY m ORDER BY m`, Date.now() - 400 * 86400000),
+    one(env, 'SELECT COALESCE(SUM(amount_cents),0) AS s, COUNT(*) AS n FROM payments WHERE received_at >= ? AND received_at < ?', f, t),
+    one(env, `SELECT COALESCE(SUM(total),0) AS s, COUNT(*) AS n FROM invoices WHERE kind = 'invoice' AND status IN ('sent','paid') AND issue_date >= ? AND issue_date <= ?`, from, to),
+    all(env, `SELECT strftime('${fmt}', received_at / 1000, 'unixepoch') AS k, SUM(amount_cents) AS s FROM payments WHERE received_at >= ? AND received_at < ? GROUP BY k ORDER BY k`, f, t),
     all(env, `SELECT CASE WHEN due_date = '' OR due_date >= ? THEN 'current' WHEN julianday(?) - julianday(due_date) <= 30 THEN '1-30' WHEN julianday(?) - julianday(due_date) <= 60 THEN '31-60' WHEN julianday(?) - julianday(due_date) <= 90 THEN '61-90' ELSE '90+' END AS bucket, SUM(total - paid) AS s, COUNT(*) AS n FROM invoices WHERE ${open} GROUP BY bucket`, today, today, today, today),
-    all(env, `SELECT p.*, i.number AS invoice_number, c.name AS customer_name, c.org AS customer_org FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id LEFT JOIN customers c ON c.id = p.customer_id ORDER BY p.received_at DESC LIMIT 8`),
+    all(env, `SELECT p.*, i.number AS invoice_number, c.name AS customer_name, c.org AS customer_org FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.received_at >= ? AND p.received_at < ? ORDER BY p.received_at DESC LIMIT 8`, f, t),
     all(env, `SELECT t.*, c.name AS customer_name, c.org AS customer_org FROM tasks t LEFT JOIN customers c ON c.id = t.customer_id WHERE t.done = 0 AND (t.due = '' OR t.due <= ?) ORDER BY CASE WHEN t.due = '' THEN '9999' ELSE t.due END LIMIT 12`, addDays(today, 7)),
     all(env, `SELECT i.*, c.name AS customer_name, c.org AS customer_org FROM invoices i LEFT JOIN customers c ON c.id = i.customer_id WHERE i.${open.replace(/ AND /g, ' AND i.')} AND i.due_date != '' AND i.due_date < ? ORDER BY i.due_date LIMIT 8`, today),
-    all(env, `SELECT c.id, c.name, c.org, SUM(p.amount_cents) AS s FROM payments p JOIN customers c ON c.id = p.customer_id WHERE p.received_at >= ? GROUP BY c.id ORDER BY s DESC LIMIT 5`, Date.now() - 365 * 86400000),
+    all(env, `SELECT c.id, c.name, c.org, SUM(p.amount_cents) AS s FROM payments p JOIN customers c ON c.id = p.customer_id WHERE p.received_at >= ? AND p.received_at < ? GROUP BY c.id ORDER BY s DESC LIMIT 5`, f, t),
     one(env, `SELECT (SELECT COUNT(*) FROM customers) AS customers, (SELECT COUNT(*) FROM customers WHERE status = 'lead') AS leads, (SELECT COUNT(*) FROM invoices WHERE kind = 'quote' AND status = 'sent') AS open_quotes, (SELECT COUNT(*) FROM recurring WHERE active = 1) AS recurring`),
   ]);
-  return { outstanding: out, overdue: over, drafts, paid30, monthly, aging, recentPayments: recentPay, tasks, overdueInvoices: overdueList.map(decorate), topCustomers: top, counts, today };
+  return { range: { from, to, days, granularity: gran }, outstanding: out, overdue: over, drafts, received, invoiced, buckets, aging, recentPayments: recentPay, tasks, overdueInvoices: overdueList.map(decorate), topCustomers: top, counts, today };
 }
 
 export async function reports(env, from, to) {
