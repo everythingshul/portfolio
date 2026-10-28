@@ -12,6 +12,8 @@ export const secretToken = () => {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 export const todayStr = () => new Date().toISOString().slice(0, 10);
+// Minutes behind UTC of the admin's browser (Date.getTimezoneOffset), so "today" and day boundaries follow their clock, not UTC.
+export const tzOf = (p) => { const n = Math.round(Number(p && p.tz)); return Number.isFinite(n) && Math.abs(n) <= 840 ? n : 0; };
 export const validDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(Date.parse(s + 'T00:00:00Z')) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
 export const addDays = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 export const addMonths = (s, n) => {
@@ -478,7 +480,8 @@ export async function dashboard(env, p) {
     from = [first && first.t ? new Date(first.t).toISOString().slice(0, 10) : '', first2 && first2.d].filter(Boolean).sort()[0] || addDays(today, -29);
   } else from = validDate(p.from) ? p.from : addDays(today, -29);
   if (from > to) [from, to] = [to, from];
-  const f = Date.parse(from + 'T00:00:00Z'), t = Date.parse(to + 'T00:00:00Z') + 86400000;
+  const tz = tzOf(p);
+  const f = Date.parse(from + 'T00:00:00Z') + tz * 60000, t = Date.parse(to + 'T00:00:00Z') + 86400000 + tz * 60000;
   const days = Math.round((t - f) / 86400000);
   const gran = days <= 62 ? 'day' : 'month';
   const fmt = gran === 'day' ? '%Y-%m-%d' : '%Y-%m';
@@ -488,7 +491,7 @@ export async function dashboard(env, p) {
     one(env, `SELECT COUNT(*) AS n, COALESCE(SUM(total),0) AS s FROM invoices WHERE kind = 'invoice' AND status = 'draft'`),
     one(env, 'SELECT COALESCE(SUM(amount_cents),0) AS s, COUNT(*) AS n FROM payments WHERE received_at >= ? AND received_at < ?', f, t),
     one(env, `SELECT COALESCE(SUM(total),0) AS s, COUNT(*) AS n FROM invoices WHERE kind = 'invoice' AND status IN ('sent','paid') AND issue_date >= ? AND issue_date <= ?`, from, to),
-    all(env, `SELECT strftime('${fmt}', received_at / 1000, 'unixepoch') AS k, SUM(amount_cents) AS s FROM payments WHERE received_at >= ? AND received_at < ? GROUP BY k ORDER BY k`, f, t),
+    all(env, `SELECT strftime('${fmt}', received_at / 1000 - ${tz * 60}, 'unixepoch') AS k, SUM(amount_cents) AS s FROM payments WHERE received_at >= ? AND received_at < ? GROUP BY k ORDER BY k`, f, t),
     all(env, `SELECT CASE WHEN due_date = '' OR due_date >= ? THEN 'current' WHEN julianday(?) - julianday(due_date) <= 30 THEN '1-30' WHEN julianday(?) - julianday(due_date) <= 60 THEN '31-60' WHEN julianday(?) - julianday(due_date) <= 90 THEN '61-90' ELSE '90+' END AS bucket, SUM(total - paid) AS s, COUNT(*) AS n FROM invoices WHERE ${open} GROUP BY bucket`, today, today, today, today),
     all(env, `SELECT p.*, i.number AS invoice_number, c.name AS customer_name, c.org AS customer_org FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.received_at >= ? AND p.received_at < ? ORDER BY p.received_at DESC LIMIT 8`, f, t),
     all(env, `SELECT t.*, c.name AS customer_name, c.org AS customer_org FROM tasks t LEFT JOIN customers c ON c.id = t.customer_id WHERE t.done = 0 AND (t.due = '' OR t.due <= ?) ORDER BY CASE WHEN t.due = '' THEN '9999' ELSE t.due END LIMIT 12`, addDays(today, 7)),
@@ -499,12 +502,13 @@ export async function dashboard(env, p) {
   return { range: { from, to, days, granularity: gran }, outstanding: out, overdue: over, drafts, received, invoiced, buckets, aging, recentPayments: recentPay, tasks, overdueInvoices: overdueList.map(decorate), topCustomers: top, counts, today };
 }
 
-export async function reports(env, from, to) {
+export async function reports(env, from, to, p) {
+  const tz = tzOf(p);
   if (!validDate(from)) from = addDays(todayStr(), -364);
   if (!validDate(to)) to = todayStr();
-  const f = Date.parse(from + 'T00:00:00Z'), t = Date.parse(to + 'T00:00:00Z') + 86400000;
+  const f = Date.parse(from + 'T00:00:00Z') + tz * 60000, t = Date.parse(to + 'T00:00:00Z') + 86400000 + tz * 60000;
   const [byMonth, byCustomer, byMethod, invoiced, tax, status] = await Promise.all([
-    all(env, `SELECT strftime('%Y-%m', received_at / 1000, 'unixepoch') AS m, SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END) AS received, SUM(CASE WHEN amount_cents < 0 THEN -amount_cents ELSE 0 END) AS refunded, SUM(amount_cents) AS net FROM payments WHERE received_at >= ? AND received_at < ? GROUP BY m ORDER BY m`, f, t),
+    all(env, `SELECT strftime('%Y-%m', received_at / 1000 - ${tz * 60}, 'unixepoch') AS m, SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END) AS received, SUM(CASE WHEN amount_cents < 0 THEN -amount_cents ELSE 0 END) AS refunded, SUM(amount_cents) AS net FROM payments WHERE received_at >= ? AND received_at < ? GROUP BY m ORDER BY m`, f, t),
     all(env, `SELECT c.id, c.name, c.org, SUM(p.amount_cents) AS s, COUNT(DISTINCT p.invoice_id) AS n FROM payments p JOIN customers c ON c.id = p.customer_id WHERE p.received_at >= ? AND p.received_at < ? GROUP BY c.id ORDER BY s DESC LIMIT 25`, f, t),
     all(env, `SELECT method, SUM(amount_cents) AS s, COUNT(*) AS n FROM payments WHERE received_at >= ? AND received_at < ? GROUP BY method ORDER BY s DESC`, f, t),
     one(env, `SELECT COUNT(*) AS n, COALESCE(SUM(total),0) AS s FROM invoices WHERE kind = 'invoice' AND status IN ('sent','paid') AND issue_date >= ? AND issue_date <= ?`, from, to),
@@ -687,9 +691,10 @@ export async function importInvoices(env, rows, opts, dry) {
 
 /* ------------------------------------------------------------------ payments list, search, wipe */
 export async function listPayments(env, p) {
+  const tzs = tzOf(p) * 60;
   const where = ['1=1']; const args = [];
-  if (validDate(p.from)) { where.push(`date(p.received_at / 1000, 'unixepoch') >= ?`); args.push(p.from); }
-  if (validDate(p.to)) { where.push(`date(p.received_at / 1000, 'unixepoch') <= ?`); args.push(p.to); }
+  if (validDate(p.from)) { where.push(`date(p.received_at / 1000 - ${tzs}, 'unixepoch') >= ?`); args.push(p.from); }
+  if (validDate(p.to)) { where.push(`date(p.received_at / 1000 - ${tzs}, 'unixepoch') <= ?`); args.push(p.to); }
   if (p.method) { where.push('p.method = ?'); args.push(p.method); }
   if (p.q) { where.push(`(i.number LIKE ? ESCAPE '\\' OR c.name LIKE ? ESCAPE '\\' OR c.org LIKE ? ESCAPE '\\')`); const l = like(p.q); args.push(l, l, l); }
   const rows = await all(env, `SELECT p.*, i.number AS invoice_number, c.name AS customer_name, c.org AS customer_org FROM payments p LEFT JOIN invoices i ON i.id = p.invoice_id LEFT JOIN customers c ON c.id = p.customer_id
