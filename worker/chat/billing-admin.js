@@ -76,6 +76,7 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
       }
       case 'import/customers': return json(await B.importCustomers(env, Array.isArray(b.rows) ? b.rows : [], b.mode, !!b.dry), 200, h);
       case 'import/invoices': return json(await B.importInvoices(env, Array.isArray(b.rows) ? b.rows : [], { source: b.source }, !!b.dry), 200, h);
+      case 'cleanup': return json(await B.cleanImported(env), 200, h);
       case 'wipe':
         if (b.confirm !== 'DELETE EVERYTHING') throw B.fail('Type DELETE EVERYTHING to confirm.');
         await B.wipeAll(env); return json({ ok: true }, 200, h);

@@ -548,7 +548,12 @@ export function parseDate(v) {
   return validDate(out) ? out : '';
 }
 
+// Spreadsheets (including Wix's CSV export) often write text as ="Dov Brieger" so Excel keeps leading zeros. Undo that.
+export const unwrapCell = (v) => (typeof v === 'string' ? v.replace(/^\s*=\s*"([\s\S]*)"\s*$/, (_, x) => x.replace(/""/g, '"')).trim() : v);
+const unwrapRow = (r) => Object.fromEntries(Object.entries(r || {}).map(([k, v]) => [k, unwrapCell(v)]));
+
 export async function importCustomers(env, rows, mode, dry) {
+  rows = rows.map(unwrapRow);
   const out = { created: 0, updated: 0, skipped: 0, errors: [] };
   const seen = new Set();
   for (let i = 0; i < rows.length && i < 500; i++) {
@@ -578,6 +583,7 @@ export async function importCustomers(env, rows, mode, dry) {
 // Rows can be one per invoice, or one per invoice line (rows with the same number are grouped).
 export async function importInvoices(env, rows, opts, dry) {
   opts = opts || {};
+  rows = rows.map(unwrapRow);
   const out = { created: 0, skipped: 0, customersCreated: 0, errors: [], payments: 0 };
   const groups = new Map();
   rows.slice(0, 600).forEach((r, i) => {
@@ -684,4 +690,44 @@ export async function search(env, q) {
 export async function wipeAll(env) {
   const tables = ['activity', 'tasks', 'payments', 'invoice_lines', 'invoices', 'recurring', 'items', 'customers', 'settings'];
   await batch(env, tables.map((t) => st(env, `DELETE FROM ${t}`)));
+}
+
+/* ------------------------------------------------------------------ one-time cleanup of imported text */
+// Imports from spreadsheets sometimes left ="Dov Brieger" in names and ="0003113" in invoice numbers. This fixes what is stored,
+// fills a missing email when a name is really an email address, and merges customers that are now obvious duplicates
+// (same email, or same name with no email). Nothing is deleted except the duplicate customer records; their invoices move to the one kept.
+const UW = (c) => `CASE WHEN ${c} LIKE '="%"' AND LENGTH(${c}) >= 4 THEN REPLACE(SUBSTR(${c}, 3, LENGTH(${c}) - 3), '""', '"') ELSE ${c} END`;
+
+export async function cleanImported(env) {
+  const out = { customers: 0, invoices: 0, merged: 0 };
+  const wrapped = await all(env, `SELECT id, number FROM invoices WHERE number LIKE '="%"'`);
+  for (const w of wrapped) await run(env, 'UPDATE activity SET text = REPLACE(text, ?, ?) WHERE invoice_id = ?', w.number, unwrapCell(w.number), w.id);   // while the old number is still there
+  const cf = ['name', 'org', 'email', 'phone', 'addr1', 'addr2', 'city', 'state', 'zip', 'country', 'tags', 'notes', 'ext_id'];
+  const c = await run(env, `UPDATE customers SET ${cf.map((f) => `${f} = ${UW(f)}`).join(', ')}, updated = ? WHERE ${cf.map((f) => `${f} LIKE '="%"'`).join(' OR ')}`, Date.now());
+  out.customers = (c.meta && c.meta.changes) || 0;
+  await run(env, `UPDATE customers SET email = LOWER(name) WHERE email = '' AND name LIKE '%_@_%.__%' AND name NOT LIKE '% %'`);
+  const i = await run(env, `UPDATE OR IGNORE invoices SET number = ${UW('number')}, notes = ${UW('notes')}, terms = ${UW('terms')}, updated = ? WHERE number LIKE '="%"' OR notes LIKE '="%"' OR terms LIKE '="%"'`, Date.now());
+  out.invoices = (i.meta && i.meta.changes) || 0;
+  await run(env, `UPDATE invoice_lines SET description = ${UW('description')} WHERE description LIKE '="%"'`);
+  await run(env, `UPDATE payments SET ref = ${UW('ref')}, note = ${UW('note')} WHERE ref LIKE '="%"' OR note LIKE '="%"'`);
+
+  const groups = [
+    ...(await all(env, `SELECT GROUP_CONCAT(id) AS ids FROM customers WHERE email != '' GROUP BY LOWER(email) HAVING COUNT(*) > 1`)),
+    ...(await all(env, `SELECT GROUP_CONCAT(id) AS ids FROM customers WHERE email = '' GROUP BY LOWER(name) HAVING COUNT(*) > 1`)),
+  ];
+  for (const g of groups) {
+    const ids = g.ids.split(',');
+    const rows = await all(env, `SELECT c.*, (SELECT COUNT(*) FROM invoices i WHERE i.customer_id = c.id) AS n FROM customers c WHERE c.id IN (${ids.map(() => '?').join(',')}) ORDER BY n DESC, c.created`, ...ids);
+    const keep = rows[0];
+    for (const d of rows.slice(1)) {
+      const stmts = ['invoices', 'payments', 'activity', 'tasks', 'recurring'].map((t) => st(env, `UPDATE ${t} SET customer_id = ? WHERE customer_id = ?`, keep.id, d.id));
+      const fill = ['org', 'email', 'phone', 'addr1', 'addr2', 'city', 'state', 'zip', 'country', 'tags', 'notes'].filter((f) => !keep[f] && d[f]);
+      if (fill.length) stmts.push(st(env, `UPDATE customers SET ${fill.map((f) => `${f} = ?`).join(', ')}, updated = ? WHERE id = ?`, ...fill.map((f) => d[f]), Date.now(), keep.id));
+      stmts.push(logAct(env, { customer_id: keep.id, type: 'system', text: `Merged a duplicate record (${d.name}) into this customer` }));
+      stmts.push(st(env, 'DELETE FROM customers WHERE id = ?', d.id));
+      await batch(env, stmts);
+      out.merged++;
+    }
+  }
+  return out;
 }

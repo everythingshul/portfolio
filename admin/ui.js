@@ -71,7 +71,8 @@
       else cell += ch;
     }
     row.push(cell); if (row.some((c) => c !== '')) rows.push(row);
-    return rows;
+    // ="text" is how spreadsheets protect leading zeros; show just the text
+    return rows.map((r) => r.map((c) => c.replace(/^\s*=\s*"([\s\S]*)"\s*$/, (_, x) => x.replace(/""/g, '"'))));
   };
 
   const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
