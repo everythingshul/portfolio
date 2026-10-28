@@ -507,10 +507,15 @@
         <label class="check pad"><input type="checkbox" name="reminders" ${s.reminders === '1' ? 'checked' : ''}> Send automatic payment reminders (3 days before the due date, on the day, then 7, 14 and 30 days late)</label>`)}</div>
       <div class="row"><button class="small-btn primary" type="submit">Save settings</button><span id="s-msg" class="subtle"></span></div></form>
       ${card('Online payments (Stripe)', '<div id="stripe-box"><div class="subtle">Checking…</div></div>', 'wide')}
+      ${card('Clean up imported data', `<p class="anote">If names or invoice numbers show up like <code>="Dov Brieger"</code> after an import, this fixes them, fills in an email when the name was really an email address, and merges customers that are exact duplicates (same email, or same name with no email). Invoices are never deleted; they move to the customer that is kept.</p><button class="small-btn" id="cleanup">Fix imported names and numbers</button> <span class="subtle" id="cleanup-msg"></span>`, 'wide')}
       ${card('Start over', `<p class="anote">Deletes every customer, invoice, quote and payment. Use it if you imported the wrong file. This can not be undone.</p><button class="small-btn danger" id="wipe">Delete all customers and billing data</button>`, 'wide')}`;
     $('sform').addEventListener('submit', async (e) => {
       e.preventDefault(); const fd = new FormData(e.target); const body = Object.fromEntries(fd.entries()); body.reminders = !!fd.get('reminders');
       try { settings = (await api('/admin/b/settings', { method: 'POST', body })).settings; $('s-msg').textContent = 'Saved'; toast('Settings saved'); } catch (x) { $('s-msg').textContent = x.message; toast(x.message); }
+    });
+    $('cleanup').addEventListener('click', async () => {
+      if (!(await U.ask('Fix imported names and numbers?', 'This rewrites text like ="Dov Brieger" as Dov Brieger on customers and invoices, and merges exact duplicate customers. It is safe to run again.', 'Fix it'))) return;
+      try { const r = await api('/admin/b/cleanup', { method: 'POST', body: {} }); const m = `Fixed ${r.customers} customer${r.customers === 1 ? '' : 's'} and ${r.invoices} invoice${r.invoices === 1 ? '' : 's'}${r.merged ? `, merged ${r.merged} duplicate${r.merged === 1 ? '' : 's'}` : ''}.`; $('cleanup-msg').textContent = m; toast(m); } catch (x) { toast(x.message); }
     });
     $('wipe').addEventListener('click', () => {
       const m = U.modal('Delete everything?', `<p class="modal-text">This permanently deletes all customers, invoices, quotes, payments and notes. Type <strong>DELETE EVERYTHING</strong> to confirm.</p><input id="wipe-t" autocomplete="off"><div class="modal-actions"><button class="small-btn" data-no>Cancel</button><button class="small-btn danger solid" id="wipe-go">Delete everything</button></div>`);
