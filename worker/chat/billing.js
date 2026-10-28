@@ -39,7 +39,7 @@ export const fail = (message, status = 400) => Object.assign(new Error(message),
 export const DEFAULTS = {
   biz_name: 'Everything Shul', biz_address: '', biz_email: '', biz_phone: '', biz_taxid: '', logo_url: '',
   invoice_prefix: 'INV-', quote_prefix: 'Q-', next_invoice: '1001', next_quote: '1001',
-  terms_days: '30', quote_days: '30', tax_rate: '0', notes: '', terms: '', currency: 'usd', reminders: '1',
+  invoice_pad: '0', terms_days: '30', quote_days: '30', tax_rate: '0', notes: '', terms: '', currency: 'usd', reminders: '1',
 };
 const TEXT_LIMITS = { biz_name: 120, biz_address: 400, biz_email: 200, biz_phone: 60, biz_taxid: 60, logo_url: 500, invoice_prefix: 12, quote_prefix: 12, notes: 1500, terms: 1500, currency: 3 };
 
@@ -59,6 +59,7 @@ export async function saveSettings(env, b) {
     let v = b[k];
     if (['next_invoice', 'next_quote'].includes(k)) v = String(int(v, 1, 99999999));
     else if (['terms_days', 'quote_days'].includes(k)) v = String(int(v, 0, 365));
+    else if (k === 'invoice_pad') v = String(int(v, 0, 12));
     else if (k === 'tax_rate') v = String(Math.max(0, Math.min(100, Number(v) || 0)));
     else if (k === 'reminders') v = v === true || v === '1' || v === 1 ? '1' : '0';
     else if (k === 'currency') { v = clean(v, 3).toLowerCase(); if (!/^[a-z]{3}$/.test(v)) v = 'usd'; }
@@ -75,7 +76,7 @@ async function nextNumber(env, kind) {
   const key = kind === 'quote' ? 'next_quote' : 'next_invoice';
   const row = await one(env, `INSERT INTO settings (k, v) VALUES (?, '1002') ON CONFLICT(k) DO UPDATE SET v = CAST(v AS INTEGER) + 1 RETURNING CAST(v AS INTEGER) - 1 AS n`, key);
   const s = await getSettings(env);
-  return (kind === 'quote' ? s.quote_prefix : s.invoice_prefix) + row.n;
+  return (kind === 'quote' ? s.quote_prefix : s.invoice_prefix) + String(row.n).padStart(int(s.invoice_pad, 0, 12), '0');
 }
 
 /* ------------------------------------------------------------------ totals */
@@ -265,7 +266,7 @@ export async function saveInvoice(env, b) {
   const t = calc(lines, { discount_type: dtype, discount_value: dval, tax_rate: taxRate });
   if (t.total > 1e10) throw fail('That total is too large.');
   const currency = /^[a-z]{3}$/i.test(b.currency || '') ? b.currency.toLowerCase() : settings.currency;
-  const notes = clean(b.notes, 1500), terms = clean(b.terms, 1500);
+  const notes = clean(b.notes, 1500), terms = clean(b.terms, 1500), title = line1(b.title, 160);
   const now = Date.now();
   let id = b.id;
   const stmts = [];
@@ -274,16 +275,16 @@ export async function saveInvoice(env, b) {
     if (!cur) throw fail('Not found', 404);
     if (cur.status === 'void') throw fail('A voided invoice can not be changed.');
     if (cur.kind === 'quote' && cur.status === 'accepted') throw fail('An accepted quote can not be changed.');
-    stmts.push(st(env, `UPDATE invoices SET customer_id=?, issue_date=?, due_date=?, currency=?, subtotal=?, discount_type=?, discount_value=?, discount_cents=?, tax_rate=?, tax_cents=?, total=?, notes=?, terms=?, updated=? WHERE id=?`,
-      customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, now, id));
+    stmts.push(st(env, `UPDATE invoices SET customer_id=?, issue_date=?, due_date=?, currency=?, subtotal=?, discount_type=?, discount_value=?, discount_cents=?, tax_rate=?, tax_cents=?, total=?, notes=?, terms=?, title=?, updated=? WHERE id=?`,
+      customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, title, now, id));
     stmts.push(st(env, 'DELETE FROM invoice_lines WHERE invoice_id = ?', id));
     stmts.push(logAct(env, { customer_id: customer.id, invoice_id: id, type: kind, text: `${kind === 'quote' ? 'Quote' : 'Invoice'} ${cur.number} edited` }));
   } else {
     id = uid();
     const number = b.number ? line1(b.number, 30) : await nextNumber(env, kind);
-    stmts.push(st(env, `INSERT INTO invoices (id, kind, number, customer_id, status, issue_date, due_date, currency, subtotal, discount_type, discount_value, discount_cents, tax_rate, tax_cents, total, paid, notes, terms, token, source, created, updated)
-                        VALUES (?,?,?,?, 'draft', ?,?,?,?,?,?,?,?,?,?, 0, ?,?,?, ?,?,?)`,
-      id, kind, number, customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, secretToken(), clean(b.source, 40), now, now));
+    stmts.push(st(env, `INSERT INTO invoices (id, kind, number, customer_id, status, issue_date, due_date, currency, subtotal, discount_type, discount_value, discount_cents, tax_rate, tax_cents, total, paid, notes, terms, title, token, source, created, updated)
+                        VALUES (?,?,?,?, 'draft', ?,?,?,?,?,?,?,?,?,?, 0, ?,?,?,?, ?,?,?)`,
+      id, kind, number, customer.id, issue, due, currency, t.subtotal, dtype, dval, t.discount_cents, taxRate, t.tax_cents, t.total, notes, terms, title, secretToken(), clean(b.source, 40), now, now));
     stmts.push(logAct(env, { customer_id: customer.id, invoice_id: id, type: kind, text: `${kind === 'quote' ? 'Quote' : 'Invoice'} ${number} created as a draft` }));
   }
   lines.forEach((l, i) => stmts.push(st(env, 'INSERT INTO invoice_lines (invoice_id, pos, description, qty, unit_cents, taxable) VALUES (?,?,?,?,?,?)', id, i, l.description, l.qty, l.unit_cents, l.taxable)));
@@ -549,7 +550,8 @@ export function parseDate(v) {
 }
 
 // Spreadsheets (including Wix's CSV export) often write text as ="Dov Brieger" so Excel keeps leading zeros. Undo that.
-export const unwrapCell = (v) => (typeof v === 'string' ? v.replace(/^\s*=\s*"([\s\S]*)"\s*$/, (_, x) => x.replace(/""/g, '"')).trim() : v);
+// Excel's other text marker is a leading apostrophe before a number or +, as in '+1 347-228-3034.
+export const unwrapCell = (v) => (typeof v === 'string' ? v.replace(/^\s*=\s*"([\s\S]*)"\s*$/, (_, x) => x.replace(/""/g, '"')).replace(/^'(?=[+\d])/, '').trim() : v);
 const unwrapRow = (r) => Object.fromEntries(Object.entries(r || {}).map(([k, v]) => [k, unwrapCell(v)]));
 
 export async function importCustomers(env, rows, mode, dry) {
@@ -642,9 +644,9 @@ export async function importInvoices(env, rows, opts, dry) {
       const id = uid(); const now = Date.now();
       const rate = subtotal - discGiven > 0 && taxGiven ? Math.round((taxGiven / (subtotal - discGiven)) * 100000) / 1000 : 0;
       const stmts = [
-        st(env, `INSERT INTO invoices (id, kind, number, customer_id, status, issue_date, due_date, currency, subtotal, discount_type, discount_value, discount_cents, tax_rate, tax_cents, total, paid, notes, terms, token, sent_at, source, created, updated)
-                 VALUES (?,?,?,?,?,?,?,?,?, 'amt', ?, ?, ?, ?, ?, 0, ?, '', ?, ?, 'import', ?, ?)`,
-          id, kind, number, cid, status, issue, due, (r.currency && /^[a-z]{3}$/i.test(r.currency) ? r.currency : settings.currency).toLowerCase(), subtotal, discGiven, discGiven, rate, taxGiven, total, clean(r.notes, 1500), secretToken(), status === 'draft' ? null : Date.parse(issue + 'T12:00:00Z'), now, now),
+        st(env, `INSERT INTO invoices (id, kind, number, customer_id, status, issue_date, due_date, currency, subtotal, discount_type, discount_value, discount_cents, tax_rate, tax_cents, total, paid, notes, terms, title, token, sent_at, source, created, updated)
+                 VALUES (?,?,?,?,?,?,?,?,?, 'amt', ?, ?, ?, ?, ?, 0, ?, '', ?, ?, ?, 'import', ?, ?)`,
+          id, kind, number, cid, status, issue, due, (r.currency && /^[a-z]{3}$/i.test(r.currency) ? r.currency : settings.currency).toLowerCase(), subtotal, discGiven, discGiven, rate, taxGiven, total, clean(r.notes, 1500), line1(r.title, 160), secretToken(), status === 'draft' ? null : Date.parse(issue + 'T12:00:00Z'), now, now),
         logAct(env, { customer_id: cid, invoice_id: id, type: kind, text: `${kind === 'quote' ? 'Quote' : 'Invoice'} ${number} imported (${statusWord || 'sent'})`, ts: now }),
       ];
       lines.forEach((l, i) => stmts.push(st(env, 'INSERT INTO invoice_lines (invoice_id, pos, description, qty, unit_cents, taxable) VALUES (?,?,?,?,?,?)', id, i, l.description, l.qty, l.unit_cents, 0)));
@@ -706,6 +708,7 @@ export async function cleanImported(env) {
   const c = await run(env, `UPDATE customers SET ${cf.map((f) => `${f} = ${UW(f)}`).join(', ')}, updated = ? WHERE ${cf.map((f) => `${f} LIKE '="%"'`).join(' OR ')}`, Date.now());
   out.customers = (c.meta && c.meta.changes) || 0;
   await run(env, `UPDATE customers SET email = LOWER(name) WHERE email = '' AND name LIKE '%_@_%.__%' AND name NOT LIKE '% %'`);
+  await run(env, `UPDATE customers SET phone = SUBSTR(phone, 2) WHERE phone LIKE '''+%' OR phone LIKE '''0%' OR phone LIKE '''1%' OR phone LIKE '''2%' OR phone LIKE '''3%' OR phone LIKE '''4%' OR phone LIKE '''5%' OR phone LIKE '''6%' OR phone LIKE '''7%' OR phone LIKE '''8%' OR phone LIKE '''9%'`);
   const i = await run(env, `UPDATE OR IGNORE invoices SET number = ${UW('number')}, notes = ${UW('notes')}, terms = ${UW('terms')}, updated = ? WHERE number LIKE '="%"' OR notes LIKE '="%"' OR terms LIKE '="%"'`, Date.now());
   out.invoices = (i.meta && i.meta.changes) || 0;
   await run(env, `UPDATE invoice_lines SET description = ${UW('description')} WHERE description LIKE '="%"'`);

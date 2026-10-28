@@ -185,6 +185,9 @@ and footer.
    STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET. Daily cron makes repeating invoices and sends reminders. Wix import is a CSV
    column-mapping wizard (Billing -> Import). Contact form and chat handoffs create CRM leads automatically (the contact Worker
    shares the BILL database). Keep copy about money neutral and do not store card data (Stripe handles it).
+   Invoice documents follow the old Wix invoices' look (css/invoice.css: navy text, light-blue table header, balance box); an invoice has a
+   `title` shown above the items, and the first row of a line's text is the item name with the rest as grey details. Invoice numbers use
+   prefix + counter padded to `invoice_pad` digits (production uses prefix "" and 7 digits, e.g. 0003114, continuing the Wix numbering).
    Exports (customers, invoices, payments, analytics) are real .xlsx files built by worker/chat/xlsx.js (no libraries) so Hebrew and other
    languages open correctly; never switch them back to CSV. Imports still read CSV (that is what Wix exports).
 
