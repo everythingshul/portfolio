@@ -215,7 +215,13 @@ for id, keys, pid, reply in NEEDS:
 add('drm_name', ['what does drm stand for', 'drm stand for', 'drm mean', 'what is drm', 'drm stands'], "DRM stands for Donor Relationship Manager: an all-in-one donor CRM built for shuls.", l=['p:drm'], c=['DRM features', 'Watch the DRM tour'], p=2)
 add('mamudem_stripe', ['mamudem stripe', 'stripe payouts', 'direct payouts', 'direct stripe', 'get paid directly', 'money go directly', 'where does the money go'], "Mamudem has direct Stripe payouts, so ticket revenue goes straight to the organization.", l=['p:mamudem'], c=['Mamudem features', TEAM], p=2)
 add('mamudem_reports', ['live check-in reporting', 'checkin reports', 'check-in report', 'attendance report', 'event report', 'event reports', 'ticket report', 'sales report', 'sales reports'], "Mamudem includes live check-in reporting, so you can see who has arrived while the event is happening.", l=['p:mamudem'], c=['Mamudem features', TEAM])
-add('kupes_new', ['is kupes new', 'new platform', 'newest', 'latest project', 'latest platform', 'most recent', 'what is new', "what's new", 'whats new', 'new on the site', 'recently built', 'recent project', 'recent projects'], "Kupes Hair Williamsburg is our newest showcase: a dedicated, white-labeled deployment of our gift-card assistance platform.", l=['p:kupeshair'], c=['Kupes Hair Williamsburg', 'Show me your work'], p=1)
+add('kupes_new', ['is kupes new', 'new platform', 'newest', 'latest project', 'latest platform', 'most recent', 'what is new', "what's new", 'whats new', 'new on the site', 'recently built', 'recent project', 'recent projects'], "The newest one at the top of our work is Everything Shul itself: the platform behind this very site, with customers, invoices, quotes and online payments. Kupes Hair Williamsburg is another recent addition, a dedicated white-labeled deployment of our gift-card assistance platform.", l=['p:everythingshul'], c=['Tell me about this site', 'Kupes Hair Williamsburg', 'Show me your work'], p=1)
+add('this_site', ['this site', 'this website', 'your own site', 'your own website', 'is this site one of your projects', 'is this site yours', 'is the site one of your projects', 'is this one of your projects', 'what is this site built with', 'how was this site built', 'how is this site built', 'what powers this site', 'what powers this website', 'about this site', 'tell me about this site', 'about this website', 'the site i am on', 'the site im on', 'this very site', 'your own platform', 'do you use your own software', 'do you use your own platform', 'eat your own dogfood', 'practice what you preach'],
+    "Yes, this site is one of our projects too. It sits at the top of our work: the platform behind it keeps customer records, sends invoices and quotes, takes online card payments with refunds, and gives the team a private admin where they answer chats. You can watch its tour in the Work section.", l=['v:everythingshul', 'p:everythingshul'], c=['Features of this site', 'Watch the tour of this site', TEAM], p=3)
+add('billing_platform', ['invoicing', 'invoicing software', 'invoice software', 'send invoices', 'sending invoices', 'online invoices', 'quotes and invoices', 'billing software', 'billing platform', 'bill my customers', 'bill customers', 'accept payments online', 'take payments online', 'online payments', 'pay invoices online', 'customer management', 'customer records', 'crm', 'client management', 'repeating invoices', 'recurring invoices', 'repeating billing', 'invoice and quote'],
+    "Our own Everything Shul platform covers customer records, invoices, quotes and repeating billing, with online card payments and refunds, plus reports you can export to Excel. The tour in the Work section walks through it. If you'd want something like it for your organization, the team can tell you what's possible. Want me to ask?", l=['v:everythingshul', 'p:everythingshul'], c=['Features of this site', TEAM, 'No thanks'], p=2)
+add('invoice_payments', ['pay my invoice', 'how do i pay', 'how do i pay my invoice', 'paying an invoice', 'pay an invoice', 'pay online', 'invoice link', 'pay with card', 'pay by card', 'card payment', 'is paying online safe', 'is the payment safe', 'is payment secure', 'secure payment', 'where do i pay'],
+    "If you were sent an invoice, open the link in the email and you can pay right on that page by card. If something looks wrong or the link doesn't work, I can connect you with the team.", c=[TEAM, 'No thanks'], a='offer', p=2)
 add('jlistings_mobile', ['jlistings mobile', 'classifieds on phone', 'classifieds mobile', 'jlistings on my phone', 'browse on phone', 'mobile-first browsing', 'mobile first'], "JListings is built mobile-first for browsing, so listings are easy to read on a phone.", l=['p:jlistings'], c=['JListings features', TEAM], p=2)
 add('fundraise_admin', ['admin controls', 'admin tools', 'backend of the wall', 'control the wall', 'who controls the wall', 'operator', 'wall controls', 'manage the wall', 'follow up tools', 'contact tools'], "Fundraise Wall comes with full admin controls behind the scenes, plus built-in contact and follow-up tools.", l=['p:fundraise'], c=['Fundraise Wall features', TEAM], p=2)
 add('kipas_site', ['kipashairbp.org', 'ecards.kipashairbp.org', 'kipas website', 'kipas admin', 'kipas ecards'], "Kipas Hair BP lives at kipashairbp.org, and its admin side runs at ecards.kipashairbp.org.", l=['v:kipashairbp', 'p:kipashairbp'], c=['Kipas Hair BP features', TEAM], p=3)
@@ -408,6 +414,7 @@ add('whatever_random', ['random question', 'random thing', 'random stuff', 'some
 
 # ---------------------------------------------------------------- per-project templated intents
 WHO = {
+    'everythingshul': "organizations that want one place for their customers, invoices, quotes and online payments, with a private admin for the team.",
     'drm': "shuls and organizations that want one dashboard for their donors, donations, recurring charges, follow-ups and receipts.",
     'kipashairbp': "organizations running a gift-card assistance program: shuls register, applicants are approved and verified, prepaid cards are loaded and activated, and spend is tracked through the season.",
     'kupeshair': "Kupes Hair Williamsburg's own gift-card assistance program, with its own branding, admin and registration flow.",
@@ -415,7 +422,7 @@ WHO = {
     'mamudem': "organizations running dinners and events: pricing tiers, ticket sales, check-in scanning and a live attendee list.",
     'fundraise': "organizations running live fundraising: a real-time donation wall for the room, plus a campaign dashboard and pledge tracking behind it.",
 }
-TOUR = {'drm': True, 'kipashairbp': True, 'kupeshair': True, 'mamudem': True, 'jlistings': False, 'fundraise': False}
+TOUR = {'everythingshul': True, 'drm': True, 'kipashairbp': True, 'kupeshair': True, 'mamudem': True, 'jlistings': False, 'fundraise': False}
 EXTRA = {'mamudem': "Also: online, phone (IVR) and SMS sales, seating and capacity alerts, direct Stripe payouts, promo codes and live check-in reporting."}
 
 PJ = [
@@ -442,6 +449,7 @@ for key, kws, tpl in PJ:
 
 # ---------------------------------------------------------------- output
 ALIASES = {
+    'everythingshul': ['this site', 'this website', 'your site', 'your website', 'everythingshul.com', 'billing platform', 'customer platform', 'billing and customer platform', 'invoicing platform', 'the billing', 'your billing'],
     'drm': ['drm', 'donor relationship manager', 'donor relationship'],
     'kipashairbp': ['kipas', 'kipa', 'kipashair', 'kipashairbp', 'kipas hair', 'hair bp', 'kipas hair bp', 'bp hair'],
     'kupeshair': ['kupes', 'kupe', 'kupeshair', 'kupes hair', 'kupes hair williamsburg', 'williamsburg hair', 'williamsburg gift'],

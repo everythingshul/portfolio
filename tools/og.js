@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const url = (p) => 'file://' + path.join(root, p);
 
 const projects = [
+  { id: 'everythingshul', name: 'Everything Shul', kind: 'Customer and billing platform', shown: 'everythingshul.com', img: 'assets/video/everythingshul-poster.jpg', pos: 'center' },
   { id: 'drm', name: 'DRM', kind: 'Donor management', shown: 'drm.everythingshul.com', img: 'assets/video/drm-poster.jpg', pos: 'center' },
   { id: 'kipashairbp', name: 'Kipas Hair BP', kind: 'Gift card assistance platform', shown: 'kipashairbp.org', img: 'assets/video/kipashairbp-poster.jpg', pos: 'center' },
   { id: 'kupeshair', name: 'Kupes Hair Williamsburg', kind: 'Gift card assistance platform', shown: 'kupeshair.org', img: 'assets/video/kupeshair-poster.jpg', pos: 'center' },
@@ -39,7 +40,7 @@ const projectCard = (p) => page(`${logo}
 <div class="rule"></div><div class="url">${p.shown}</div>`);
 
 const homeCard = () => {
-  const cells = projects.map((p, i) => {
+  const cells = projects.slice(0, 6).map((p, i) => {
     const col = i % 3, row = Math.floor(i / 3);
     return `<div style="position:absolute;left:${560 + col * 196}px;top:${150 + row * 168}px;width:184px;height:104px;border:2px solid #3a4766;border-radius:5px;background:#0d1526 url(${url(p.img)}) ${p.pos}/cover no-repeat"></div>`;
   }).join('');
