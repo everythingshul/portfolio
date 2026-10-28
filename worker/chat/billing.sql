@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   tax_cents INTEGER NOT NULL DEFAULT 0,
   total INTEGER NOT NULL DEFAULT 0,
   paid INTEGER NOT NULL DEFAULT 0,
+  title TEXT NOT NULL DEFAULT '',             -- heading above the items, e.g. "Mass Text"
   notes TEXT NOT NULL DEFAULT '',             -- shown to the customer
   terms TEXT NOT NULL DEFAULT '',
   token TEXT NOT NULL,                        -- secret in the public link

@@ -51,12 +51,12 @@ export async function publicInvoice(env, token) {
   }
   const i = d.invoice, c = d.customer;
   return {
-    kind: i.kind, number: i.number, state: i.state, status: i.status, issue_date: i.issue_date, due_date: i.due_date, currency: i.currency,
+    kind: i.kind, number: i.number, title: i.title || '', state: i.state, status: i.status, issue_date: i.issue_date, due_date: i.due_date, currency: i.currency,
     lines: d.lines, subtotal: i.subtotal, discount_cents: i.discount_cents, discount_type: i.discount_type, discount_value: i.discount_value,
     tax_rate: i.tax_rate, tax_cents: i.tax_cents, total: i.total, paid: i.paid, balance: i.balance, notes: i.notes, terms: i.terms || s.terms,
-    customer: { name: c.name, org: c.org, email: c.email, addr1: c.addr1, addr2: c.addr2, city: c.city, state: c.state, zip: c.zip, country: c.country },
-    business: { name: s.biz_name, address: s.biz_address, email: s.biz_email, phone: s.biz_phone, taxid: s.biz_taxid, logo_url: s.logo_url },
-    payments: d.payments.map((p) => ({ amount_cents: p.amount_cents, received_at: p.received_at, method: p.method })),
+    customer: { name: c.name, org: c.org, email: c.email, phone: c.phone, addr1: c.addr1, addr2: c.addr2, city: c.city, state: c.state, zip: c.zip, country: c.country },
+    business: { name: s.biz_name, address: s.biz_address, email: s.biz_email, phone: s.biz_phone, taxid: s.biz_taxid, logo_url: s.logo_url, website: String(env.SITE_URL || '').replace(/^https?:\/\//, '') },
+    payments: d.payments.map((p) => ({ amount_cents: p.amount_cents, received_at: p.received_at, method: p.method, ref: p.method === 'stripe' ? '' : p.ref })),
     can_pay: !!env.STRIPE_SECRET_KEY && i.kind === 'invoice' && i.status === 'sent' && i.balance >= 50,
   };
 }

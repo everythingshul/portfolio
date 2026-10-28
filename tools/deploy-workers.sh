@@ -86,6 +86,7 @@ else
   patch_id worker/wrangler.toml BILL "$BILL_ID"
   (cd worker/chat && $WR d1 execute everythingshul-stats --remote --file=schema.sql 2>&1 | grep -E "Executed|error|Error" || true)
   (cd worker/chat && $WR d1 execute everythingshul-billing --remote --file=billing.sql 2>&1 | grep -E "Executed|error|Error" || true)
+  (cd worker/chat && $WR d1 execute everythingshul-billing --remote --file=billing-migrate.sql >/dev/null 2>&1 || true)   # adds invoices.title on older databases; harmless when it already exists
 fi
 
 echo "4/5 Deploying the Workers..."

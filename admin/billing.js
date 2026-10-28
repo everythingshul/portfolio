@@ -109,7 +109,7 @@
 
   /* ------------------------------------------------------------------ one invoice */
   const docData = (d, s) => ({ ...d.invoice, lines: d.lines, customer: d.customer, payments: d.payments, terms: d.invoice.terms || s.terms,
-    business: { name: s.biz_name, address: s.biz_address, email: s.biz_email, phone: s.biz_phone, taxid: s.biz_taxid, logo_url: s.logo_url } });
+    business: { name: s.biz_name, address: s.biz_address, email: s.biz_email, phone: s.biz_phone, taxid: s.biz_taxid, logo_url: s.logo_url, website: location.host } });
   const payUrl = (inv) => `${location.origin}/pay/?t=${inv.token}`;
 
   async function openInvoice(id) {
@@ -267,7 +267,8 @@
           <label class="f"><span>${q ? 'Quote' : 'Invoice'} date</span><input type="date" name="issue_date" id="ie-issue" value="${esc(cur.issue_date)}"></label>
           <label class="f"><span>${q ? 'Valid until' : 'Due date'}</span><input type="date" name="due_date" id="ie-due" value="${esc(cur.due_date)}"></label></div>
           ${q ? '' : '<div class="chips quickdue"><span class="subtle">Due in</span>' + [0, 7, 15, 30, 45, 60].map((n) => `<button type="button" class="chip" data-net="${n}">${n === 0 ? 'On receipt' : n + ' days'}</button>`).join('') + '</div>'}</section>
-        <section class="acard"><h3>Items</h3><div id="ie-lines"></div></section>
+        <section class="acard"><label class="f"><span>Title (shown above the items, optional)</span><input name="title" maxlength="160" value="${esc(cur.title || '')}" placeholder="e.g. Mass Text, or KupesHair.org Platform"></label></section>
+        <section class="acard"><h3>Items</h3><p class="anote">On each line, the first row is the item name. Anything on the next rows is shown under it as details.</p><div id="ie-lines"></div></section>
         <div class="grid2"><section class="acard"><div class="grid2">
             <label class="f"><span>Discount</span><div class="inline"><input name="discount_value" id="ie-dv" inputmode="decimal" value="${cur.discount_value ? esc(String(cur.discount_value)) : ''}" placeholder="0"><select name="discount_type" id="ie-dt"><option value="pct"${cur.discount_type === 'pct' ? ' selected' : ''}>%</option><option value="amt"${cur.discount_type === 'amt' ? ' selected' : ''}>$</option></select></div></label>
             <label class="f"><span>Tax rate (%) on taxable items</span><input name="tax_rate" id="ie-tax" inputmode="decimal" value="${esc(String(cur.tax_rate || 0))}"></label></div>
@@ -306,7 +307,7 @@
       const f = Object.fromEntries(new FormData(e.target).entries());
       $('ie-err').textContent = '';
       if (!f.customer_id) { $('ie-err').textContent = 'Choose a customer.'; return; }
-      const body = { id: existing && existing.id, kind: cur.kind, customer_id: f.customer_id, issue_date: f.issue_date, due_date: f.due_date, lines: lines.get(), discount_type: f.discount_type,
+      const body = { id: existing && existing.id, kind: cur.kind, title: f.title, customer_id: f.customer_id, issue_date: f.issue_date, due_date: f.due_date, lines: lines.get(), discount_type: f.discount_type,
         discount_value: f.discount_type === 'pct' ? Number(f.discount_value) || 0 : toCents(f.discount_value) || 0, tax_rate: Number(f.tax_rate) || 0, notes: f.notes, terms: f.terms, currency: cur.currency, send: mode === 'send' };
       el.querySelectorAll('button[type=submit]').forEach((b) => { b.disabled = true; });
       try {
@@ -502,7 +503,7 @@
     const f = (k, label, type, hint, attrs) => `<label class="f"><span>${label}</span><input name="${k}" type="${type || 'text'}" value="${esc(s[k])}" ${attrs || ''}>${hint ? `<small>${hint}</small>` : ''}</label>`;
     el.innerHTML = `<form id="sform"><div class="grid2">
       ${card('Your business (shown on every invoice)', `${f('biz_name', 'Business name', 'text', '', 'maxlength="120"')}<label class="f"><span>Address</span><textarea name="biz_address" rows="3" maxlength="400">${esc(s.biz_address)}</textarea></label><div class="grid2">${f('biz_email', 'Email', 'email', 'Replies to invoices go here')}${f('biz_phone', 'Phone')}</div>${f('biz_taxid', 'Tax ID / EIN (optional)')}<label class="f"><span>Logo address</span><input name="logo_url" type="url" value="${esc(/\/assets\/logo\.png$/.test(s.logo_url) ? '' : s.logo_url)}" placeholder="Empty = the website logo"><small>A web address starting with https://</small></label>`)}
-      ${card('Numbering and defaults', `<div class="grid2">${f('invoice_prefix', 'Invoice number prefix')}${f('next_invoice', 'Next invoice number', 'number', '', 'min="1"')}${f('quote_prefix', 'Quote number prefix')}${f('next_quote', 'Next quote number', 'number', '', 'min="1"')}${f('terms_days', 'Payment due after (days)', 'number', '', 'min="0"')}${f('tax_rate', 'Default tax rate (%)', 'text')}</div>
+      ${card('Numbering and defaults', `<div class="grid2">${f('invoice_prefix', 'Invoice number prefix')}${f('next_invoice', 'Next invoice number', 'number', '', 'min="1"')}${f('quote_prefix', 'Quote number prefix')}${f('next_quote', 'Next quote number', 'number', '', 'min="1"')}${f('invoice_pad', 'Pad numbers to this many digits', 'number', 'e.g. 7 gives 0003114. 0 = no padding', 'min="0" max="12"')}${f('terms_days', 'Payment due after (days)', 'number', '', 'min="0"')}${f('tax_rate', 'Default tax rate (%)', 'text')}</div>
         <label class="f"><span>Default message on invoices</span><textarea name="notes" rows="2" maxlength="1500">${esc(s.notes)}</textarea></label><label class="f"><span>Default terms</span><textarea name="terms" rows="2" maxlength="1500">${esc(s.terms)}</textarea></label>
         <label class="check pad"><input type="checkbox" name="reminders" ${s.reminders === '1' ? 'checked' : ''}> Send automatic payment reminders (3 days before the due date, on the day, then 7, 14 and 30 days late)</label>`)}</div>
       <div class="row"><button class="small-btn primary" type="submit">Save settings</button><span id="s-msg" class="subtle"></span></div></form>
