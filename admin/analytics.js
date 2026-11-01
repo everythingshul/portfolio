@@ -33,14 +33,18 @@
 
   /* ------------------------------------------------------------------ date ranges */
   const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  // Calendar days back from today's local midnight. Adding 24h per day would be an hour off across a clock change.
+  const daysAgo = (n) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return d.getTime(); };
+  const dstr = (t) => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const dayAfter = (t) => { const d = new Date(t); d.setDate(d.getDate() + 1); return d.getTime(); };
   function setRange(name, custom) {
     const now = Date.now();
     state.range = name;
-    if (name === 'today') { state.from = dayStart(now); state.to = now + 1; }
-    else if (name === 'yesterday') { state.from = dayStart(now) - DAY; state.to = dayStart(now); }
-    else if (name === '7d') { state.from = dayStart(now) - 6 * DAY; state.to = now + 1; }
-    else if (name === '30d') { state.from = dayStart(now) - 29 * DAY; state.to = now + 1; }
-    else if (name === '90d') { state.from = dayStart(now) - 89 * DAY; state.to = now + 1; }
+    if (name === 'today') { state.from = daysAgo(0); state.to = now + 1; }
+    else if (name === 'yesterday') { state.from = daysAgo(1); state.to = daysAgo(0); }
+    else if (name === '7d') { state.from = daysAgo(6); state.to = now + 1; }
+    else if (name === '30d') { state.from = daysAgo(29); state.to = now + 1; }
+    else if (name === '90d') { state.from = daysAgo(89); state.to = now + 1; }
     else if (name === 'custom' && custom) { state.from = custom.from; state.to = custom.to; }
   }
 
@@ -85,20 +89,26 @@
   /* ------------------------------------------------------------------ charts */
   const niceMax = (m) => { if (m <= 4) return 4; const p = Math.pow(10, Math.floor(Math.log10(m))); const f = m / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
 
-  function buckets(d) {
-    const { from, to, hourly } = d.range; const tzMs = TZ * 60000; const out = [];
-    const step = hourly ? 3600000 : DAY;
-    const start = hourly ? Math.floor((from + tzMs) / step) * step - tzMs : Math.floor((from + tzMs) / DAY) * DAY - tzMs;
-    for (let t = start; t < to; t += step) {
-      const iso = new Date(t + tzMs).toISOString();
-      out.push({ key: hourly ? iso.slice(0, 10) + ' ' + iso.slice(11, 13) + ':00' : iso.slice(0, 10), t });
+  // Bucket starts in the browser's own calendar (local hours or local midnights), sent to the Worker so a day means the
+  // same thing on screen and in the numbers, even across a clock change.
+  function bucketStarts(from, to) {
+    const hourly = to - from <= 2 * DAY + 3600000;
+    const out = []; const d = new Date(from);
+    if (hourly) d.setMinutes(0, 0, 0); else d.setHours(0, 0, 0, 0);
+    while (d.getTime() < to && out.length < 800) {
+      out.push(d.getTime());
+      if (hourly) d.setHours(d.getHours() + 1); else d.setDate(d.getDate() + 1);
     }
-    return out;
+    return { hourly, starts: out };
+  }
+  function buckets(d) {
+    const { hourly, starts } = bucketStarts(d.range.from, d.range.to);
+    return starts.map((t, i) => ({ i, t, hourly }));
   }
 
   function lineChart(d) {
-    const bs = buckets(d); const map = Object.fromEntries(d.series.map((r) => [r.b, r]));
-    const rows = bs.map((b) => ({ ...b, visitors: (map[b.key] || {}).visitors || 0, sessions: (map[b.key] || {}).sessions || 0, pageviews: (map[b.key] || {}).pageviews || 0 }));
+    const bs = buckets(d); const map = Object.fromEntries(d.series.map((r) => [r.i, r]));
+    const rows = bs.map((b) => ({ ...b, visitors: (map[b.i] || {}).visitors || 0, sessions: (map[b.i] || {}).sessions || 0, pageviews: (map[b.i] || {}).pageviews || 0 }));
     const keys = Object.keys(state.series).filter((k) => state.series[k]);
     const colors = { visitors: '#25a9ea', sessions: '#9be0a8', pageviews: '#c9a76a' };
     const W = 900, H = 270, P = { l: 46, r: 24, t: 14, b: 30 };
@@ -108,7 +118,7 @@
     const y = (v) => H - P.b - (H - P.t - P.b) * (v / max);
     const grid = [0, 1, 2, 3, 4].map((i) => { const v = (max / 4) * i; return `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${P.l - 8}" y="${y(v) + 4}" text-anchor="end" class="gt">${fmt(Math.round(v))}</text>`; }).join('');
     const every = Math.ceil(n / 8);
-    const lab = (r) => (d.range.hourly ? r.key.slice(11) : new Date(r.t + TZ * 60000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }));
+    const lab = (r) => (r.hourly ? new Date(r.t).toLocaleTimeString('en-US', { hour: 'numeric' }) : new Date(r.t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
     const xl = rows.map((r, i) => (i % every === 0 ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" class="gt">${esc(lab(r))}</text>` : '')).join('');
     const lines = keys.map((k, ki) => {
       const pts = rows.map((r, i) => `${x(i).toFixed(1)},${y(r[k]).toFixed(1)}`).join(' ');
@@ -220,8 +230,8 @@
   };
 
   /* ------------------------------------------------------------------ live view + visits */
-  async function renderVisitors(el) {
-    el.innerHTML = '<div class="aempty">Loading…</div>';
+  async function renderVisitors(el, quiet) {
+    if (!quiet) el.innerHTML = '<div class="aempty">Loading…</div>';
     const [live, sess] = await Promise.all([api('/admin/stats/live'), api(`/admin/stats/sessions?from=${state.from}&to=${state.to}`)]);
     const evName = (e) => {
       const x = (() => { try { return JSON.parse(e.extra || '{}'); } catch (err) { return {}; } })();
@@ -280,7 +290,6 @@
 
   function chrome() {
     const R = [['today', 'Today'], ['yesterday', 'Yesterday'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days']];
-    const dstr = (t) => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
     $('analytics').innerHTML =
       `<div class="abar"><div class="chips">${R.map(([k, l]) => `<button class="chip${state.range === k ? ' on' : ''}" data-r="${k}">${l}</button>`).join('')}</div>
         <div class="custom"><input type="date" id="a-from" value="${dstr(state.from)}"> <span>to</span> <input type="date" id="a-to" value="${dstr(state.to - 1)}"> <button class="small-btn" id="a-apply">Apply</button></div>
@@ -288,29 +297,43 @@
        <div class="asub">${VIEWS.map(([k, l]) => `<button class="stab${state.view === k ? ' on' : ''}" data-v="${k}">${l}</button>`).join('')}</div>
        <div id="a-body"></div>`;
     $('analytics').querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => { setRange(b.dataset.r); load(); }));
-    $('a-apply').addEventListener('click', () => { const f = new Date($('a-from').value + 'T00:00:00').getTime(); const t = new Date($('a-to').value + 'T00:00:00').getTime() + DAY; if (f && t > f) { setRange('custom', { from: f, to: t }); load(); } });
+    $('a-apply').addEventListener('click', () => { const f = new Date($('a-from').value + 'T00:00:00').getTime(); const t = dayAfter(new Date($('a-to').value + 'T00:00:00').getTime()); if (f && t > f) { setRange('custom', { from: f, to: t }); load(); } });
     $('a-cmp').addEventListener('change', (e) => { state.cmp = e.target.checked; load(); });
-    $('a-refresh').addEventListener('click', () => load());
+    $('a-refresh').addEventListener('click', () => load(true));
     $('analytics').querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => { state.view = b.dataset.v; history.replaceState(null, '', '#analytics'); chrome(); draw(); }));
   }
 
-  async function draw() {
+  async function draw(quiet) {
     const body = $('a-body'); if (!body) return;
     if (state.view === 'settings') return renderSettings(body);
-    if (state.view === 'visitors') { try { await renderVisitors(body); } catch (e) { body.innerHTML = `<div class="aempty">${esc(e.message)}</div>`; } return; }
+    if (state.view === 'visitors') { try { await renderVisitors(body, quiet); } catch (e) { body.innerHTML = `<div class="aempty">${esc(e.message)}</div>`; } return; }
     if (!state.data) { body.innerHTML = '<div class="aempty">Loading…</div>'; return; }
     body.innerHTML = views[state.view](state.data);
     body.querySelectorAll('input[data-s]').forEach((c) => c.addEventListener('change', () => { state.series[c.dataset.s] = c.checked; if (!Object.values(state.series).some(Boolean)) state.series.visitors = true; draw(); }));
   }
 
-  async function load() {
-    chrome();
+  // Keeps the bar in step with the range without rebuilding the page.
+  function syncBar() {
+    $('analytics').querySelectorAll('[data-r]').forEach((b) => b.classList.toggle('on', b.dataset.r === state.range));
+    const f = $('a-from'), t = $('a-to');
+    if (f && document.activeElement !== f) f.value = dstr(state.from);
+    if (t && document.activeElement !== t) t.value = dstr(state.to - 1);
+  }
+
+  // Runs only when asked: opening the tab, choosing a range, or pressing Refresh. Refresh keeps what is on screen
+  // until the new numbers arrive, then swaps them in at the same scroll position.
+  async function load(keep) {
+    if (state.range !== 'custom') setRange(state.range);   // "7 days" always means the last 7 days as of now
+    const y = window.scrollY;
+    if (keep && $('a-body')) syncBar(); else chrome();
     const body = $('a-body');
-    if (state.view === 'visitors' || state.view === 'settings') return draw();
-    body.innerHTML = '<div class="aempty">Loading…</div>';
+    if (state.view === 'visitors' || state.view === 'settings') { await draw(keep); if (keep) window.scrollTo(0, y); return; }
+    if (!keep || !state.data) body.innerHTML = '<div class="aempty">Loading…</div>';
     try {
-      state.data = await api(`/admin/stats?from=${state.from}&to=${state.to}&tz=${TZ}&cmp=${state.cmp ? 1 : 0}`);
-      draw();
+      const starts = bucketStarts(state.from, state.to).starts.join(',');
+      state.data = await api(`/admin/stats?from=${state.from}&to=${state.to}&tz=${TZ}&b=${starts}&cmp=${state.cmp ? 1 : 0}`);
+      await draw(keep);
+      if (keep) window.scrollTo(0, y);
     } catch (e) {
       body.innerHTML = `<div class="aempty">${esc(e.message)}${/not set up/.test(e.message) ? '<br>The analytics database still needs to be created. See worker/chat/README.md.' : ''}</div>`;
     }
@@ -320,9 +343,7 @@
     show(apiFn, base, tokenFn) {
       api = apiFn; api.base = base; api.token = tokenFn;
       if (!state.from) setRange('7d');
-      load();
-      clearInterval(state.timer);
-      state.timer = setInterval(() => { if (!$('analytics').hidden && document.visibilityState === 'visible') { if (state.view === 'visitors') draw(); else if (!['settings'].includes(state.view) && state.range !== 'custom') load(); } }, 30000);
+      load();   // no timers: nothing refreshes or moves unless you ask (the Refresh button)
     },
     hide() { clearInterval(state.timer); },
   };

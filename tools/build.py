@@ -477,6 +477,9 @@ if __name__ == '__main__':
         d = os.path.join(root, 'share', p['id'])
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, 'index.html'), 'w').write(share_page(p))
+    pages = ['', 'contact.html', 'terms.html', 'privacy.html']
+    open(os.path.join(root, 'sitemap.xml'), 'w').write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(f'  <url><loc>{SITE}/{pg}</loc></url>\n' for pg in pages) + '</urlset>\n')
+    open(os.path.join(root, 'robots.txt'), 'w').write(f'User-agent: *\nDisallow: /admin/\nDisallow: /pay/\n\nSitemap: {SITE}/sitemap.xml\n')
     import kb
     n_entries, n_variants, n_pj = kb.out()
     print('built index.html, contact.html,', len(PROJECTS), 'share pages and the chat knowledge base:', n_variants + n_pj, 'replies')

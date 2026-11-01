@@ -429,7 +429,7 @@
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
   try { state.history = JSON.parse(ssGet(STORE) || '[]'); } catch (e) { state.history = []; }
-  const save = () => { if (!human) ssSet(STORE, JSON.stringify(state.history.filter((m) => !m.form && !m.voice).slice(-30))); };
+  const save = () => { if (!human) ssSet(STORE, JSON.stringify(state.history.filter((m) => !m.form && !m.voice).slice(-150))); };
 
   /* ====================================================================== DOM */
   const el = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
@@ -570,7 +570,7 @@
   /* ====================================================================== handoff form */
   const validEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
-  const transcript = () => state.history.filter((m) => !m.form && !m.voice && m.text).slice(-14)
+  const transcript = () => state.history.filter((m) => !m.form && !m.voice && m.text).slice(-150)
     .map((m) => ({ role: m.role === 'user' ? 'customer' : 'bot', text: m.text }));
 
   function addForm(m) {

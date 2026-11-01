@@ -75,12 +75,15 @@
       if (lastUnread !== null && unread > lastUnread && document.hidden) toast('New chat message');
       lastUnread = unread;
       const list = $('list');
-      if (!conversations.length) { list.innerHTML = '<div class="empty">No chats yet. When a visitor asks for the team, it shows up here.</div>'; return; }
-      list.innerHTML = conversations.map((c) =>
+      if (!conversations.length) { list.dataset.sig = ''; list.innerHTML = '<div class="empty">No chats yet. When a visitor asks for the team, it shows up here.</div>'; return; }
+      const html = conversations.map((c) =>
         `<button class="item${c.id === current ? ' active' : ''}" data-id="${esc(c.id)}">
            <div class="row1"><span>${c.unread ? '<i class="dot"></i>' : ''}${esc(c.name || c.email)}${c.status === 'closed' ? '<span class="tag">closed</span>' : ''}</span><time>${ago(c.updated)}</time></div>
            <div class="row2">${c.lastFrom === 'admin' ? 'You: ' : ''}${esc(c.last)}</div>
          </button>`).join('');
+      if (list.dataset.sig === html) return;   // nothing changed: leave the list (and its scroll position) alone
+      list.dataset.sig = html;
+      list.innerHTML = html;
       list.querySelectorAll('.item').forEach((b) => b.addEventListener('click', () => openConv(b.dataset.id)));
     } catch (e) {
       if (e.auth) { try { localStorage.removeItem(KEY); } catch (x) { /* ignore */ } showGate('That password was not accepted.'); }
@@ -92,6 +95,15 @@
     document.title = (n ? `(${n}) ` : '') + 'Chat inbox — Everything Shul';
   }
 
+  let convSig = '';
+  async function refreshIfChanged() {
+    const id = current;
+    try {
+      const c = await api('/admin/conv?id=' + encodeURIComponent(id));
+      if (id === current && c.messages.length + ':' + c.status !== convSig) openConv(id, true);
+    } catch (e) { /* try again next time */ }
+  }
+
   async function openConv(id, keepDraft) {
     current = id;
     history.replaceState(null, '', '#' + id);
@@ -99,6 +111,7 @@
     try {
       const c = await api('/admin/conv?id=' + encodeURIComponent(id));
       const keep = keepDraft && $('draft') ? { d: $('draft').value, t: $('teach-on') && $('teach-on').checked } : { d: '', t: false };
+      convSig = c.messages.length + ':' + c.status;
       const lastQ = [...c.messages].reverse().find((m) => m.from === 'customer' && !m.voice);
       $('conv').innerHTML =
         `<div class="conv-head"><div><button class="small-btn back" id="back">‹ Back</button> <strong>${esc(c.name || c.email)}</strong><br><a href="mailto:${esc(c.email)}">${esc(c.email)}</a>${c.status === 'closed' ? '<span class="tag">closed</span>' : ''}</div>
@@ -222,7 +235,7 @@
       if ($('app').hidden) return;
       loadList(); loadTeachCount();
       const d = $('draft');
-      if (tab === 'chats' && current && !(d && d.value)) openConv(current, true);  // refresh the open chat unless a reply is being typed
+      if (tab === 'chats' && current && !(d && d.value)) refreshIfChanged();  // only redraws the open chat when it has a new message
     }, 10000);
   }
 

@@ -238,7 +238,7 @@ async function handoff(request, env, h) {
   if (!EMAIL_RE.test(email) || (!message && !voice)) return json({ error: 'Please give a valid email and a message.' }, 400, h);
 
   const now = Date.now();
-  const earlier = (Array.isArray(b.transcript) ? b.transcript : []).slice(-14)
+  const earlier = (Array.isArray(b.transcript) ? b.transcript : []).slice(-150)
     .map((m) => ({ from: m && m.role === 'customer' ? 'customer' : 'bot', text: clean(m && m.text, 600), ts: now }))
     .filter((m) => m.text);
   const conv = {
@@ -372,7 +372,8 @@ async function admin(request, url, env, h) {
     const to = Math.max(from + 1, parseInt(sp.get('to') || '0', 10) || now + 1);
     if (path === '/admin/stats' && request.method === 'GET') {
       const tz = Math.max(-840, Math.min(840, parseInt(sp.get('tz') || '0', 10) || 0));
-      return json(await computeStats(env.STATS, { from, to, tz, compare: sp.get('cmp') !== '0' }), 200, h);
+      const bounds = (sp.get('b') || '').split(',').filter(Boolean).slice(0, 801).map(Number);
+      return json(await computeStats(env.STATS, { from, to, tz, compare: sp.get('cmp') !== '0', bounds }), 200, h);
     }
     if (path === '/admin/stats/live') return json(await liveStats(env.STATS), 200, h);
     if (path === '/admin/stats/sessions') return json({ sessions: await recentSessions(env.STATS, from, to) }, 200, h);
