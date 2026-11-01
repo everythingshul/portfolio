@@ -238,7 +238,7 @@ async function handoff(request, env, h) {
   if (!EMAIL_RE.test(email) || (!message && !voice)) return json({ error: 'Please give a valid email and a message.' }, 400, h);
 
   const now = Date.now();
-  const earlier = (Array.isArray(b.transcript) ? b.transcript : []).slice(-14)
+  const earlier = (Array.isArray(b.transcript) ? b.transcript : []).slice(-150)
     .map((m) => ({ from: m && m.role === 'customer' ? 'customer' : 'bot', text: clean(m && m.text, 600), ts: now }))
     .filter((m) => m.text);
   const conv = {

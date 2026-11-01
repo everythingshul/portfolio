@@ -42,7 +42,7 @@ export function adminNotification(conv, text, link, siteUrl, isNew) {
   const who = conv.name ? `${conv.name} (${conv.email})` : conv.email;
   const context = isNew && conv.messages.length > 1
     ? `<p style="margin:0 0 8px;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;color:${C.muted};">Chat before the handoff</p>` +
-      quote(conv.messages.slice(0, -1).slice(-8).map((m) => `${m.from === 'customer' ? 'Visitor' : 'Chesky'}: ${m.text}`).join('\n'))
+      quote(conv.messages.slice(0, -1).map((m) => `${m.from === 'customer' ? 'Visitor' : 'Chesky'}: ${m.text}`).join('\n'))
     : '';
   const content = `${heading(isNew ? 'New chat request' : 'New message in a chat')}
 <p style="margin:0 0 18px;"><strong>${esc(who)}</strong> wrote on the website chat:</p>

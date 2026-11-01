@@ -164,7 +164,7 @@ and footer.
    questions from then on (taught answers beat built-in ones; they can be edited or forgotten). Visitors can
    never add answers themselves. Replies sent from Gmail directly are not seen by the system; only replies
    sent from the admin page teach him.
-   **Handoff:** when stuck (or asked for a person) the visitor leaves an email; the team replies from /admin/;
+   **Handoff:** when stuck (or asked for a person) the visitor leaves an email (the whole chat so far, up to 150 messages, goes with it and is shown in the admin page and the team email); the team replies from /admin/;
    the visitor sees it in the chat and gets it by email (worker/chat, see its README). Until the client
    deploys that Worker (KV + Brevo key + ADMIN_TOKEN) and sets js/chat-config.js, the handoff falls back to
    opening the visitor's email app and nothing is logged or learned.
