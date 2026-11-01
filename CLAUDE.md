@@ -176,7 +176,11 @@ and footer.
    admin/analytics.js, Worker code in worker/chat/stats.js). No IPs stored (daily salted hash), DNT/GPC honored, bots
    ignored, 13-month retention (cron purge), weekly digest email Mondays (`DIGEST` var). Needs the D1 database created
    (tools/deploy-workers.sh does it if the API token has Account > D1 > Edit); until then /t is a no-op and the tab
-   shows a setup note. If tracking changes, update privacy.html in tools/build.py and the chat_privacy reply in tools/kb.py.
+   shows a setup note. Dashboard numbers: visits/visitors count sessions that started in the range; page views and events are counted
+   by when they happened (so bars, totals and the pages table agree). Day and hour buckets are chosen by the browser in its own
+   calendar and sent to the Worker (`b=` list of bucket starts), so a day matches the admin's clock across clock changes. Rolling
+   ranges (7 days etc.) are recomputed on every load. Nothing in the admin refreshes on a timer; Analytics only reloads on the Refresh
+   button, and the chat inbox only redraws when something changed. If tracking changes, update privacy.html in tools/build.py and the chat_privacy reply in tools/kb.py.
 
 8. **Voice notes:** the chat (mic button) and contact form ("Or record a voice note") record in the browser (js/voice.js),
    convert to 16 kHz mono WAV and send base64 in the JSON. Chesky can't listen, so a voice note in the bot chat opens the

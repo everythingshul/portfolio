@@ -154,25 +154,32 @@ const quantile = (arr, q) => { if (!arr.length) return null; const s = [...arr].
 async function q(db, stmts) { return (await db.batch(stmts)).map((r) => r.results || []); }
 
 export async function totals(db, from, to) {
-  const [[t]] = await q(db, [db.prepare(
-    `SELECT COUNT(*) sessions, COUNT(DISTINCT uid) visitors, COALESCE(SUM(pages),0) pageviews, COALESCE(SUM(events),0) events,
+  // Visits and visitors count sessions that started in the range. Page views and events are counted by when they
+  // happened, so they agree with the pages table and with a single day's chart bar.
+  const [[t], [ev]] = await q(db, [db.prepare(
+    `SELECT COUNT(*) sessions, COUNT(DISTINCT uid) visitors,
             COALESCE(SUM(CASE WHEN pages<=1 AND interact=0 AND active_s<10 THEN 1 ELSE 0 END),0) bounces,
             COALESCE(SUM(active_s),0) active, COALESCE(SUM(interact>0),0) engaged
-     FROM sessions WHERE ts>=? AND ts<?`).bind(from, to)]);
+     FROM sessions WHERE ts>=? AND ts<?`).bind(from, to),
+  db.prepare(`SELECT COALESCE(SUM(type='pageview'),0) pageviews, COUNT(*) events FROM events WHERE ts>=? AND ts<?`).bind(from, to)]);
   return {
-    sessions: t.sessions, visitors: t.visitors, pageviews: t.pageviews, events: t.events,
-    bounceRate: pct(t.bounces, t.sessions), pagesPerSession: t.sessions ? Math.round((t.pageviews / t.sessions) * 100) / 100 : 0,
+    sessions: t.sessions, visitors: t.visitors, pageviews: ev.pageviews, events: ev.events,
+    bounceRate: pct(t.bounces, t.sessions), pagesPerSession: t.sessions ? Math.round((ev.pageviews / t.sessions) * 100) / 100 : 0,
     avgEngaged: t.sessions ? Math.round(t.active / t.sessions) : 0, engagedRate: pct(t.engaged, t.sessions),
   };
 }
 
-export async function computeStats(db, { from, to, tz = 0, compare = true }) {
+export async function computeStats(db, { from, to, tz = 0, compare = true, bounds = null }) {
   const off = Math.round(tz) * 60; // seconds
   const hourly = to - from <= 2 * DAY + 1;
   const bucket = hourly ? `strftime('%Y-%m-%d %H:00', ts/1000 + ${off}, 'unixepoch')` : `strftime('%Y-%m-%d', ts/1000 + ${off}, 'unixepoch')`;
   const R = [from, to];
   const S = (sql, ...args) => db.prepare(sql).bind(...args);
 
+  // Day (or hour) buckets are chosen by the browser, in its own calendar, and arrive as a list of start times.
+  const bs = Array.isArray(bounds) ? bounds.map((x) => Math.trunc(Number(x))).filter(Number.isFinite) : [];
+  const useB = bs.length > 0 && bs.length <= 800 && bs.every((x, i) => i === 0 || x > bs[i - 1]);
+  const bvals = useB ? bs.map((x, i) => `(${i},${x},${i + 1 < bs.length ? bs[i + 1] : Math.trunc(to)})`).join(',') : '';
   const res = await q(db, [
     /* 0 series */ S(`SELECT ${bucket} b, COUNT(*) sessions, COUNT(DISTINCT uid) visitors, SUM(pages) pageviews FROM sessions WHERE ts>=? AND ts<? GROUP BY b ORDER BY b`, ...R),
     /* 1 heat */ S(`SELECT CAST(strftime('%w', ts/1000 + ${off}, 'unixepoch') AS INTEGER) d, CAST(strftime('%H', ts/1000 + ${off}, 'unixepoch') AS INTEGER) h, COUNT(*) n FROM sessions WHERE ts>=? AND ts<? GROUP BY d, h`, ...R),
@@ -221,7 +228,9 @@ export async function computeStats(db, { from, to, tz = 0, compare = true }) {
     /* 25 errors */ S(`SELECT name msg, COUNT(*) n, MAX(ts) last, MAX(path) path, MAX(json_extract(extra,'$.s')) src FROM events WHERE type='error' AND ts>=? AND ts<? GROUP BY name ORDER BY n DESC LIMIT 20`, ...R),
     /* 26 video totals */ S(`SELECT SUM(name='open') opens, SUM(name='play') plays, SUM(name='p25') p25, SUM(name='p50') p50, SUM(name='p75') p75, SUM(name='p100') p100, AVG(CASE WHEN name='close' THEN value END) watch FROM events WHERE type='video' AND ts>=? AND ts<?`, ...R),
     /* 27 share methods */ S(`SELECT json_extract(extra,'$.m') k, COUNT(*) n FROM events WHERE type='share' AND ts>=? AND ts<? GROUP BY k`, ...R),
-    /* 28 session length buckets */ S(`SELECT CASE WHEN active_s<10 THEN '0-10s' WHEN active_s<30 THEN '10-30s' WHEN active_s<60 THEN '30-60s' WHEN active_s<180 THEN '1-3 min' ELSE '3+ min' END k, COUNT(*) n FROM sessions WHERE ts>=? AND ts<? GROUP BY k`, ...R),
+    /* 28 series by the browser's buckets: visits and visitors */ useB ? S(`WITH b(i,s,e) AS (VALUES ${bvals}) SELECT b.i i, COUNT(*) sessions, COUNT(DISTINCT x.uid) visitors FROM sessions x JOIN b ON x.ts>=b.s AND x.ts<b.e WHERE x.ts>=? AND x.ts<? GROUP BY b.i`, ...R) : S('SELECT 1 WHERE 0'),
+    /* 29 series: page views */ useB ? S(`WITH b(i,s,e) AS (VALUES ${bvals}) SELECT b.i i, COUNT(*) pageviews FROM events x JOIN b ON x.ts>=b.s AND x.ts<b.e WHERE x.type='pageview' AND x.ts>=? AND x.ts<? GROUP BY b.i`, ...R) : S('SELECT 1 WHERE 0'),
+    /* 30 session length buckets */ S(`SELECT CASE WHEN active_s<10 THEN '0-10s' WHEN active_s<30 THEN '10-30s' WHEN active_s<60 THEN '30-60s' WHEN active_s<180 THEN '1-3 min' ELSE '3+ min' END k, COUNT(*) n FROM sessions WHERE ts>=? AND ts<? GROUP BY k`, ...R),
   ]);
 
   const timeBy = Object.fromEntries(res[3].map((r) => [r.path, r]));
@@ -237,7 +246,7 @@ export async function computeStats(db, { from, to, tz = 0, compare = true }) {
   const out = {
     range: { from, to, tz, hourly },
     totals: await totals(db, from, to),
-    series: res[0], heat: res[1],
+    series: useB ? bs.map((_, i) => ({ i, sessions: (res[28].find((r) => r.i === i) || {}).sessions || 0, visitors: (res[28].find((r) => r.i === i) || {}).visitors || 0, pageviews: (res[29].find((r) => r.i === i) || {}).pageviews || 0 })) : res[0], heat: res[1],
     pages, entry: res[4].map((r) => ({ ...r, bounceRate: pct(r.bounces, r.sessions) })), exit: res[5],
     channels: res[6].map((r) => ({ ...r, bounceRate: pct(r.bounces, r.sessions), engaged: Math.round(r.engaged || 0) })),
     referrers: res[7], campaigns: res[8],
@@ -246,7 +255,7 @@ export async function computeStats(db, { from, to, tz = 0, compare = true }) {
     projects: res[17].map((r) => ({ ...r, dwell: r.dwell == null ? null : Math.round(r.dwell), watch: r.watch == null ? null : Math.round(r.watch), completion: pct(r.p100, r.tour_opens) })),
     clicks: res[18], scroll: res[19], funnel: res[20][0] || {},
     chat: { ...(res[22][0] || {}), topics: res[21] }, form: res[23][0] || {}, vitals, errors: res[25],
-    video: res[26][0] || {}, shareMethods: res[27], sessionLength: res[28],
+    video: res[26][0] || {}, shareMethods: res[27], sessionLength: res[30],
   };
   if (compare) {
     const span = to - from;
