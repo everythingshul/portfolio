@@ -89,8 +89,8 @@
   .ax .asub { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
   .ax .stab.on { color: var(--ink); background: rgba(37,169,234,0.14); border-color: var(--cyan); }
   .ax .kpis { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
-  .ax .kpis.one { margin-bottom: 0; } .ax .kpis.one .kpi { flex-basis: 130px; }
-  .ax .kpi { flex: 1 1 150px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); padding: 14px 16px; }
+  .ax .kpis.one { margin-bottom: 0; } .ax .kpis.one .kpi { min-width: 130px; }
+  .ax .kpi { flex: 1 1 auto; min-width: 150px; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); padding: 14px 16px; }
   .ax .kv { font-family: 'Newsreader', serif; font-size: 1.9rem; line-height: 1.1; color: var(--ink); }
   .ax .kv small { font-size: 0.9rem; color: var(--ink-3); }
   .ax .kl { font-size: 0.8rem; color: var(--ink-3); margin-top: 4px; }
@@ -140,7 +140,7 @@
   .ax .hrow span { font-size: 0.68rem; color: var(--ink-3); text-align: center; white-space: nowrap; }
   .ax .hrow .hd { text-align: left; line-height: 20px; }
   .ax .hc { height: 20px; border-radius: 3px; }
-  .ax .vgrid { display: flex; flex-wrap: wrap; gap: 12px; } .ax .vgrid > * { flex: 1 1 210px; min-width: 0; }
+  .ax .vgrid { display: flex; flex-wrap: wrap; gap: 12px; } .ax .vgrid > * { flex: 1 1 auto; min-width: 210px; max-width: 100%; }
   .ax .vcard { border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 12px 14px; }
   .ax .vcard.good { border-left-color: var(--good); }
   .ax .vcard.ok { border-left-color: var(--okc); }
