@@ -52,7 +52,7 @@
   .reply .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.82rem; color: var(--ink-3); }
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; z-index: 50; }
   .back { display: none; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--rule); }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--rule); overflow-x: auto; scrollbar-width: none; } .tabs .tab { flex: none; white-space: nowrap; }
   .tab { padding: 10px 16px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-3); font: inherit; cursor: pointer; }
   .tab:hover { color: var(--ink); }
   .tab.active { color: var(--ink); border-bottom-color: var(--cyan); }
@@ -83,17 +83,18 @@
   .ax .chip, .ax .stab { padding: 7px 13px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--ink-2); font: inherit; font-size: 0.85rem; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
   .ax .chip:hover, .ax .stab:hover { color: var(--ink); border-color: var(--ink-3); }
   .ax .chip.on { background: var(--cyan); border-color: var(--cyan); color: var(--on-cyan); }
-  .ax .custom { display: flex; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--ink-3); }
+  .ax .custom { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--ink-3); }
   .ax .custom input[type=date] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; font-size: 0.85rem; color-scheme: dark; }
   .ax .check { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; color: var(--ink-2); cursor: pointer; }
   .ax .asub { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
   .ax .stab.on { color: var(--ink); background: rgba(37,169,234,0.14); border-color: var(--cyan); }
-  .ax .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
-  .ax .kpis.one { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin-bottom: 0; }
-  .ax .kpi { border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); padding: 14px 16px; }
+  .ax .kpis { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .ax .kpis.one { margin-bottom: 0; } .ax .kpis.one .kpi { min-width: 130px; }
+  .ax .kpi { flex: 1 1 auto; min-width: 150px; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-2); padding: 14px 16px; }
   .ax .kv { font-family: 'Newsreader', serif; font-size: 1.9rem; line-height: 1.1; color: var(--ink); }
   .ax .kv small { font-size: 0.9rem; color: var(--ink-3); }
   .ax .kl { font-size: 0.8rem; color: var(--ink-3); margin-top: 4px; }
+  @media (max-width: 600px) { .ax .kpis { gap: 8px; } .ax .kpi, .ax .kpis.one .kpi { flex: 1 1 110px; min-width: 0; padding: 10px 12px; } .ax .kl { overflow-wrap: anywhere; } .ax .kv { font-size: 1.25rem; white-space: nowrap; } .ax .kl { font-size: 0.74rem; margin-top: 2px; } .ax .vgrid > * { min-width: 0; } }
   .ax .kd { min-height: 1.1em; margin-top: 6px; font-size: 0.78rem; }
   .ax .dl { color: var(--ink-3); }
   .ax .dl.up { color: var(--good); }
@@ -103,8 +104,8 @@
   .ax .acard h3 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 1.15rem; color: var(--ink); margin-bottom: 4px; }
   .ax .anote { color: var(--ink-3); font-size: 0.8rem; margin: 2px 0 12px; max-width: 60em; }
   .ax .acard > h3 + :not(.anote) { margin-top: 12px; }
-  .ax .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-  .ax .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .ax .grid2 { display: flex; flex-wrap: wrap; column-gap: 14px; } .ax .grid2 > * { flex: 1 1 380px; min-width: 0; }
+  .ax .grid3 { display: flex; flex-wrap: wrap; column-gap: 14px; } .ax .grid3 > * { flex: 1 1 260px; min-width: 0; }
   .ax .aempty { padding: 22px 8px; text-align: center; color: var(--ink-3); font-size: 0.9rem; }
   .ax .bars { display: flex; flex-direction: column; gap: 9px; }
   .ax .bar { display: grid; grid-template-columns: minmax(80px, 38%) 1fr auto; gap: 10px; align-items: center; font-size: 0.86rem; }
@@ -140,7 +141,7 @@
   .ax .hrow span { font-size: 0.68rem; color: var(--ink-3); text-align: center; white-space: nowrap; }
   .ax .hrow .hd { text-align: left; line-height: 20px; }
   .ax .hc { height: 20px; border-radius: 3px; }
-  .ax .vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .ax .vgrid { display: flex; flex-wrap: wrap; gap: 12px; } .ax .vgrid > * { flex: 1 1 auto; min-width: 210px; max-width: 100%; }
   .ax .vcard { border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 12px 14px; }
   .ax .vcard.good { border-left-color: var(--good); }
   .ax .vcard.ok { border-left-color: var(--okc); }
