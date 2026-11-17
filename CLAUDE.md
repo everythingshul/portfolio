@@ -68,7 +68,10 @@ non-profits") — all were explicitly removed per client request. Don't reintrod
 
 ## The showcase products (in `index.html`, `#showcase` section)
 
-0. **Everything Shul** (`everythingshul.com`, this site) is the newest card and sits on top as 07. Cards are numbered from the
+00. **Get A Bus NY** (`getabusny.com`) is the newest card and sits on top as 08 (charter bus booking platform; its tour video is the
+   client's own recording, used as sent, with music; features come from the site and the "getabusny.com review" chat). Chesky knows it
+   (aliases "get a bus", `need_bus`).
+0. **Everything Shul** (`everythingshul.com`, this site) is card 07 now. Cards are numbered from the
    bottom up (Fundraise Wall 01 ... DRM 06, this site 07), so a new project goes first in PROJECTS and the numbers follow from the
    list length. The card has a real product tour (`assets/video/everythingshul-*`): a screen recording of the admin (customers,
    invoices, emails, online payment, refund, overview, terms) with made-up demo data, plus a walk through the live portfolio sites.

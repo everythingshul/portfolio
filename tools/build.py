@@ -10,6 +10,11 @@ import html, os
 SITE = 'https://everythingshul.com'
 
 PROJECTS = [
+    dict(id='getabusny', name='Get A Bus NY', full='Get A Bus NY — Charter Bus Booking', kind='Charter bus booking platform', new=True,
+         url='https://getabusny.com', shown='getabusny.com',
+         desc='A charter bus booking platform: visitors browse the fleet and trip types and request a quote with every stop on the route, then the customer signs and pays online while the office runs quotes, invoices, texts and emails from one back office.',
+         features=['Fleet, areas and trip pages with a quote form', 'Multi-stop routes, drag a stop to reorder', 'Quotes with e-signature and private customer links', 'Invoices, payments, texts and emails in one back office'],
+         video=dict(preview='assets/video/getabusny-preview.mp4', poster='assets/video/getabusny-poster.jpg', tour='assets/video/getabusny-tour.mp4')),
     dict(id='everythingshul', name='Everything Shul', full='Everything Shul — Customers, Billing & Payments', kind='Customer and billing platform', new=True,
          url='https://everythingshul.com', shown='everythingshul.com',
          desc='The platform behind this very site: customer records, invoices and quotes, online card payments with refunds, and a private admin where the team answers visitors and sees what is happening.',
