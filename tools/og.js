@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const url = (p) => 'file://' + path.join(root, p);
 
 const projects = [
+  { id: 'getabusny', name: 'Get A Bus NY', kind: 'Charter bus booking platform', shown: 'getabusny.com', img: 'assets/video/getabusny-poster.jpg', pos: 'center' },
   { id: 'everythingshul', name: 'Everything Shul', kind: 'Customer and billing platform', shown: 'everythingshul.com', img: 'assets/video/everythingshul-poster.jpg', pos: 'center' },
   { id: 'drm', name: 'DRM', kind: 'Donor management', shown: 'drm.everythingshul.com', img: 'assets/video/drm-poster.jpg', pos: 'center' },
   { id: 'kipashairbp', name: 'Kipas Hair BP', kind: 'Gift card assistance platform', shown: 'kipashairbp.org', img: 'assets/video/kipashairbp-poster.jpg', pos: 'center' },
