@@ -44,7 +44,7 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
         case 'labels': return json({ labels: await G.allLabels(env), links: await G.allLinks(env), palette: G.PALETTE, types: G.LABEL_TYPES }, 200, h);
         case 'export': {
           const kind = ['customers', 'payments', 'ledger'].includes(q.kind) ? q.kind : 'invoices';
-          const sheet = kind === 'ledger' ? await G.ledgerExport(env, q.from, q.to) : await B.exportData(env, kind, q.from, q.to);
+          const sheet = kind === 'ledger' ? await G.ledgerExport(env, q.from, q.to, q.business) : await B.exportData(env, kind, q.from, q.to);
           return new Response(buildXlsx([sheet]), { status: 200, headers: { ...h, 'Content-Type': XLSX_TYPE, 'Content-Disposition': `attachment; filename="${kind}.xlsx"`, 'Cache-Control': 'no-store' } });
         }
         default: return json({ error: 'Not found' }, 404, h);
@@ -102,6 +102,8 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
         const row = b.id ? await G.ledgerUpdate(env, Number(b.id), b, actor) : await G.ledgerCreate(env, b, actor);
         return json(row, 200, h);
       }
+      case 'business/save': return json(await G.saveBusiness(env, b), 200, h);
+      case 'business/delete': await G.deleteBusiness(env, Number(need(b.id, 'id'))); return json({ ok: true }, 200, h);
       case 'ledger/delete': await G.ledgerDelete(env, Number(need(b.id, 'id'))); return json({ ok: true }, 200, h);
       case 'ledger/maaser': return json(await G.ledgerMaaser(env, Number(need(b.id, 'id')), !!b.given, 'admin'), 200, h);
       case 'ledger/file-remove': await G.ledgerRemoveFile(env, Number(need(b.id, 'id'))); return json({ ok: true }, 200, h);

@@ -178,6 +178,45 @@
   const sgn = (r) => `<span class="${r.direction === 'out' ? 'led-out' : 'led-in'}">${r.direction === 'out' ? '-' : '+'}${esc(money(r.amount_cents))}</span>`;
   const usDate = (d) => `${d.slice(5, 7)}/${d.slice(8, 10)}/${d.slice(0, 4)}`;
 
+  /* businesses: one ledger, several businesses */
+  const BIZ_PALETTE = ['#4986e7', '#16a765', '#ff7537', '#b99aff', '#f691b2', '#fad165', '#2da2bb', '#fb4c2f'];
+  const bizOf = (opts, id) => (opts.businesses || []).find((b) => b.id === id);
+  const bizChip = (opts, id) => { const b = bizOf(opts, id); return b ? `<span class="biz"><i class="dot" style="background:${esc(b.color)}"></i>${esc(b.name)}</span>` : ''; };
+  const homeId = (opts) => ((opts.businesses || []).find((b) => b.is_home) || (opts.businesses || [])[0] || {}).id;
+
+  function manageBusinesses(opts, after) {
+    const m = U.modal('Businesses in this ledger', `<div class="cform"><p class="anote">Every ledger entry belongs to one business. Invoice payments from this site always go to the first one. Pick a business with the chips above the ledger to see only its entries, or choose All businesses.</p>
+      <div id="bizlist"></div>
+      <div class="fsec"><strong>Add a business</strong></div>
+      <div class="inline"><input id="bn" placeholder="Business name" maxlength="80"><button type="button" class="small-btn primary" id="badd">Add</button></div>
+      <p class="form-err" role="alert"></p></div>`);
+    const root = m.el; const err = () => root.querySelector('.form-err');
+    let changed = false;
+    const list = () => {
+      root.querySelector('#bizlist').innerHTML = opts.businesses.map((b) => `<div class="lblm" data-id="${b.id}"><button type="button" class="swatch" data-color="${b.id}" style="background:${esc(b.color)}" title="Change color" aria-label="Change color of ${esc(b.name)}"></button>
+        <input data-name="${b.id}" value="${esc(b.name)}" maxlength="80" style="flex:1;min-width:0"><span class="subtle">${b.entries} entr${b.entries === 1 ? 'y' : 'ies'}${b.is_home ? ' · gets invoice payments' : ''}</span>
+        <button type="button" class="small-btn" data-save="${b.id}">Save</button>${b.is_home ? '' : `<button type="button" class="small-btn danger" data-del="${b.id}">Delete</button>`}</div>`).join('');
+      root.querySelectorAll('[data-color]').forEach((x) => {
+        x.onclick = () => {
+          const b = bizOf(opts, +x.dataset.color);
+          document.querySelectorAll('.lblpick').forEach((o) => o.remove());
+          const pop = document.createElement('div'); pop.className = 'lblpick';
+          pop.innerHTML = `<div class="pal">${BIZ_PALETTE.map((c) => `<button type="button" class="sw ${c === b.color ? 'on' : ''}" data-c="${c}" style="background:${c}" aria-label="Color ${c}"></button>`).join('')}</div>`;
+          document.body.append(pop); place(pop, x);
+          pop.onclick = (ev) => { const sw = ev.target.closest('[data-c]'); if (!sw) return; pop.remove(); guard(async () => { await post('business/save', { id: b.id, name: b.name, color: sw.dataset.c }); b.color = sw.dataset.c; changed = true; list(); }); };
+          dismissOnOutside(pop, x);
+        };
+      });
+      root.querySelectorAll('[data-save]').forEach((x) => { x.onclick = async () => { const b = bizOf(opts, +x.dataset.save); err().textContent = ''; try { const r = await post('business/save', { id: b.id, name: root.querySelector(`[data-name="${b.id}"]`).value, color: b.color }); b.name = r.name; changed = true; list(); toast('Saved'); } catch (e) { err().textContent = e.message; } }; });
+      root.querySelectorAll('[data-del]').forEach((x) => { x.onclick = async () => { const b = bizOf(opts, +x.dataset.del); err().textContent = ''; try { await post('business/delete', { id: b.id }); opts.businesses = opts.businesses.filter((y) => y.id !== b.id); changed = true; list(); toast('Business deleted'); } catch (e) { err().textContent = e.message; } }; });
+    };
+    list();
+    root.querySelector('#badd').onclick = async () => { err().textContent = ''; try { const r = await post('business/save', { name: root.querySelector('#bn').value }); opts.businesses.push({ ...r, entries: 0 }); root.querySelector('#bn').value = ''; changed = true; list(); toast('Business added'); } catch (e) { err().textContent = e.message; } };
+    const wrap = root.closest('.modal-wrap');
+    const done = new MutationObserver(() => { if (!document.body.contains(wrap)) { done.disconnect(); if (changed && after) after(); } });
+    done.observe(document.body, { childList: true });
+  }
+
   function ledgerModal(entry, opts, after) {
     const e = entry || { direction: 'out', date: todayIn(opts.timezone), amount_cents: 0 };
     const auto = !!e.auto, isNew = !e.id;
@@ -191,6 +230,7 @@
         <label class="f"><span>Date</span><input id="dt" type="date" value="${esc(e.date)}" ${dis}></label>
         <label class="f"><span>Amount ($)</span><input id="am" inputmode="decimal" value="${e.amount_cents ? dollars(e.amount_cents) : ''}" ${dis}></label>
         <label class="f"><span>Paid with</span><input id="pw" list="pwl" value="${esc(e.paid_with || '')}" placeholder="Credit card, check, cash..."></label></div>
+        <label class="f"><span>Business</span><select id="bz" ${dis}>${(opts.businesses || []).map((b) => `<option value="${b.id}" ${b.id === (e.business_id || homeId(opts)) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>
         <div class="notice" id="mzbox" ${e.direction === 'out' ? 'hidden' : ''}><strong>Maaser: <span id="mzamt">${esc(money(e.id ? e.maaser_cents : 0))}</span></strong> (ten percent of the money in)<label class="check pad"><input type="checkbox" id="mzgiven" ${e.maaser_given ? 'checked' : ''}> Maaser already given. Record it as a charity expense.</label></div>
         <label class="f"><span>Vendor${e.direction === 'in' ? ' or customer' : ''}</span><input id="vn" value="${esc(e.vendor || '')}" placeholder="Who was paid or who paid you" ${dis}></label>
         <div class="grid2"><label class="f"><span>Invoice #</span><input id="iv" value="${esc(e.invoice_ref || '')}" ${dis} placeholder="Their invoice or receipt number"></label>
@@ -220,7 +260,7 @@
       const err = q('.form-err'); err.textContent = '';
       try {
         const b = { vendor: q('#vn').value, invoice_ref: q('#iv').value, description: q('#ds').value, paid_with: q('#pw').value, account: q('#ac').value, category: q('#ct').value, notes: q('#nt').value };
-        if (!auto) { b.direction = q('#ld').value; b.date = q('#dt').value; const am = toCents(q('#am').value); if (!am) { err.textContent = 'Enter the amount.'; return; } b.amount_cents = am; }
+        if (!auto) { b.direction = q('#ld').value; b.date = q('#dt').value; b.business_id = +q('#bz').value; const am = toCents(q('#am').value); if (!am) { err.textContent = 'Enter the amount.'; return; } b.amount_cents = am; }
         const wantGiven = q('#ld').value === 'in' && q('#mzgiven').checked;
         if (isNew) b.maaser_given = wantGiven; else b.id = e.id;
         const saved = await post('ledger/save', b);
@@ -238,23 +278,25 @@
 
   B().defineView('ledger', async (el) => {
     let sel; try { sel = JSON.parse(sessionStorage.getItem('led_sel') || 'null'); } catch (e) { sel = null; }
-    sel = sel || { k: 'month', custom: null, dir: '', account: '', category: '', q: '' };
+    sel = sel || { k: 'month', custom: null, dir: '', account: '', category: '', q: '', business: '' };
+    sel.business = sel.business || '';
     const save = () => { try { sessionStorage.setItem('led_sel', JSON.stringify(sel)); } catch (e) { /* ignore */ } };
     const opts0 = await api('/admin/b/ledger/options');
+    if (sel.business && !bizOf(opts0, +sel.business)) sel.business = '';
     const today = () => todayIn(opts0.timezone);
     const body = () => $('ledbody');
     const tbl = (head, rows) => `<div class="tscroll"><table class="atable"><thead><tr>${head.map((h) => `<th${/^>/.test(h) ? ' class="n"' : ''}>${esc(h.replace(/^>/, ''))}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
     let data = null;
     const load = async () => {
       const [from, to] = rangeOf(sel.k, sel.custom, today());
-      const qs = new URLSearchParams({ from, to }); if (sel.dir) qs.set('direction', sel.dir); if (sel.account) qs.set('account', sel.account); if (sel.category) qs.set('category', sel.category); if (sel.q) qs.set('q', sel.q);
+      const qs = new URLSearchParams({ from, to }); if (sel.dir) qs.set('direction', sel.dir); if (sel.account) qs.set('account', sel.account); if (sel.category) qs.set('category', sel.category); if (sel.q) qs.set('q', sel.q); if (sel.business) qs.set('business', sel.business);
       data = await api('/admin/b/ledger?' + qs);
       const t = data.totals;
       const cats = {}; for (const c of data.byCategory) { (cats[c.k] = cats[c.k] || { k: c.k, in: 0, out: 0 })[c.direction] = c.c; }
       const catRows = Object.values(cats).sort((a, b) => b.in + b.out - (a.in + a.out));
       const kpi = (l, v, s, cls) => `<div class="kpi ${cls || ''}"><div class="kv">${v}</div><div class="kl">${esc(l)}</div>${s ? `<div class="kd">${s}</div>` : ''}</div>`;
       const rowHtml = data.rows.map((r) => `<tr class="led-row" data-id="${r.id}" data-lbl="ledger:${r.id}">
-        <td style="white-space:nowrap">${esc(usDate(r.date))}</td><td>${esc(r.vendor || '')}</td>
+        <td style="white-space:nowrap">${esc(usDate(r.date))}</td><td>${bizChip(opts0, r.business_id)}</td><td>${esc(r.vendor || '')}</td>
         <td>${r.invoice_id ? `<a href="#" data-invlink="${esc(r.invoice_id)}" style="white-space:nowrap">${esc(r.invoice_ref || 'Invoice')}</a>` : esc(r.invoice_ref || '')}</td>
         <td>${esc(r.description || '')}</td><td class="n">${sgn(r)}</td><td>${esc(r.paid_with || '')}</td><td>${esc(r.account || '')}</td><td class="subtle">${esc(r.notes || '')}</td>
         <td class="n">${r.direction === 'in' && r.maaser_cents ? `<label class="mz" title="Tick when the maaser has been given"><span>${esc(money(r.maaser_cents))}</span><input type="checkbox" data-maaser="${r.id}" ${r.maaser_given ? 'checked' : ''} aria-label="Maaser given"><small>${r.maaser_given ? 'given' : 'owed'}</small></label>` : ''}</td>
@@ -264,14 +306,16 @@
         ${kpi('Money out', `<span class="led-out">${esc(money(t.money_out))}</span>`, `${data.rows.filter((r) => r.direction === 'out').length} entries`)}
         ${kpi('Net', `<span class="${t.net < 0 ? 'led-out' : ''}">${t.net < 0 ? '-' : ''}${esc(money(Math.abs(t.net)))}</span>`, `${t.entries} entr${t.entries === 1 ? 'y' : 'ies'} counted`)}
         ${kpi('Maaser still owed', esc(money(t.maaser_owed)), `10% of money in &middot; ${esc(money(t.maaser_given))} given`)}</div>
-      ${data.rows.length ? tbl(['Date', 'Vendor', 'Invoice #', 'Description', '>Amount', 'Paid with', 'Account', 'Notes', '>Maaser 10%', 'Attached'], rowHtml) : '<div class="aempty">No entries in this period. Payments on invoices appear here by themselves.</div>'}
+      ${data.rows.length ? tbl(['Date', 'Business', 'Vendor', 'Invoice #', 'Description', '>Amount', 'Paid with', 'Account', 'Notes', '>Maaser 10%', 'Attached'], rowHtml) : '<div class="aempty">No entries in this period. Payments on invoices appear here by themselves.</div>'}
+      ${!sel.business && opts0.businesses.length > 1 ? `<section class="acard" style="margin-top:18px"><h3>By business</h3>${tbl(['Business', '>Entries', '>In', '>Out', '>Net'], opts0.businesses.map((bz) => { const x = data.byBusiness.find((y) => y.id === bz.id) || { money_in: 0, money_out: 0, n: 0 }; const net = x.money_in - x.money_out; return `<tr><td>${bizChip(opts0, bz.id)}</td><td class="n">${x.n}</td><td class="n"><span class="led-in">${esc(money(x.money_in))}</span></td><td class="n"><span class="led-out">${esc(money(x.money_out))}</span></td><td class="n"><span class="${net < 0 ? 'led-out' : ''}">${net < 0 ? '-' : ''}${esc(money(Math.abs(net)))}</span></td></tr>`; }))}</section>` : ''}
       <div class="grid2" style="margin-top:18px"><section class="acard"><h3>By category</h3>${catRows.length ? tbl(['Category', '>In', '>Out'], catRows.map((r) => `<tr><td>${esc(r.k)}</td><td class="n">${r.in ? `<span class="led-in">${esc(money(r.in))}</span>` : ''}</td><td class="n">${r.out ? `<span class="led-out">${esc(money(r.out))}</span>` : ''}</td></tr>`)) : '<div class="aempty">Nothing yet.</div>'}</section>
-      <section class="acard"><h3>Balance by account <span class="subtle">all time</span></h3>${data.balances.length ? tbl(['Account', '>Entries', '>Net'], data.balances.map((r) => `<tr><td>${esc(r.k)}</td><td class="n">${r.n}</td><td class="n"><span class="${r.net < 0 ? 'led-out' : 'led-in'}">${r.net < 0 ? '-' : ''}${esc(money(Math.abs(r.net)))}</span></td></tr>`)) : '<div class="aempty">Nothing yet.</div>'}</section></div>`;
+      <section class="acard"><h3>Balance by account <span class="subtle">all time${sel.business ? ', this business' : ''}</span></h3>${data.balances.length ? tbl(['Account', '>Entries', '>Net'], data.balances.map((r) => `<tr><td>${esc(r.k)}</td><td class="n">${r.n}</td><td class="n"><span class="${r.net < 0 ? 'led-out' : 'led-in'}">${r.net < 0 ? '-' : ''}${esc(money(Math.abs(r.net)))}</span></td></tr>`)) : '<div class="aempty">Nothing yet.</div>'}</section></div>`;
       $$('tr.led-row', body()).forEach((tr) => tr.addEventListener('click', (ev) => { if (ev.target.closest('a,button,input,label.mz')) return; ledgerModal(data.rows.find((x) => x.id === +tr.dataset.id), opts0, load); }));
       decorateAll();
     };
     const optList = (list, cur, blank) => `<option value="">${blank}</option>${list.map((x) => `<option ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}`;
-    el.innerHTML = `<div class="toolbar"><div class="chips" id="lchips">${PRESETS.map(([k, l]) => `<button class="chip ${k === sel.k ? 'on' : ''}" data-k="${k}">${l}</button>`).join('')}</div>
+    el.innerHTML = `<div class="toolbar"><div class="chips" id="lbiz">${[{ id: '', name: 'All businesses', color: '' }, ...opts0.businesses].map((b) => `<button class="chip ${String(b.id) === String(sel.business) ? 'on' : ''}" data-k="${b.id}">${b.color ? `<i class="dot" style="background:${esc(b.color)}"></i> ` : ''}${esc(b.name)}</button>`).join('')}</div><span class="grow"></span><button class="small-btn" id="lmanage">Manage businesses</button></div>
+      <div class="toolbar"><div class="chips" id="lchips">${PRESETS.map(([k, l]) => `<button class="chip ${k === sel.k ? 'on' : ''}" data-k="${k}">${l}</button>`).join('')}</div>
       <span id="lcustom" class="custom" ${sel.k === 'custom' ? '' : 'hidden'}><input type="date" id="lfrom" value="${esc(sel.custom ? sel.custom[0] : today().slice(0, 8) + '01')}" aria-label="From"> <span class="subtle">to</span> <input type="date" id="lto" value="${esc(sel.custom ? sel.custom[1] : today())}" aria-label="To"> <button class="small-btn primary" id="lgo">Show</button></span></div>
       <div class="toolbar"><div class="chips" id="ldir">${[['', 'All'], ['in', 'Money in'], ['out', 'Money out']].map(([k, l]) => `<button class="chip ${k === sel.dir ? 'on' : ''}" data-k="${k}">${l}</button>`).join('')}</div>
         <select id="lacc" aria-label="Account">${optList(opts0.accounts, sel.account, 'All accounts')}</select><select id="lcat" aria-label="Category">${optList(opts0.categories, sel.category, 'All categories')}</select>
@@ -279,16 +323,19 @@
         <button class="small-btn primary" id="lin">+ Money in</button><button class="small-btn primary" id="lout">+ Money out</button><button class="small-btn" id="lex">Export to Excel</button></div>
       <div id="ledbody"><div class="aempty">Loading…</div></div>`;
     const go = () => { save(); load().catch((x) => { body().innerHTML = `<div class="aempty">${esc(x.message)}</div>`; }); };
+    $('lbiz').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; sel.business = b.dataset.k; $$('#lbiz .chip').forEach((x) => x.classList.toggle('on', x === b)); go(); };
+    $('lmanage').onclick = () => manageBusinesses(opts0, () => B().refresh());
     $('lchips').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; sel.k = b.dataset.k; $$('#lchips .chip').forEach((x) => x.classList.toggle('on', x === b)); $('lcustom').hidden = sel.k !== 'custom'; if (sel.k !== 'custom') go(); };
     $('lgo').onclick = () => { const a = $('lfrom').value, b = $('lto').value; if (!a || !b) return toast('Pick both dates'); sel.custom = a <= b ? [a, b] : [b, a]; go(); };
     $('ldir').onclick = (e) => { const b = e.target.closest('.chip'); if (!b) return; sel.dir = b.dataset.k; $$('#ldir .chip').forEach((x) => x.classList.toggle('on', x === b)); go(); };
     $('lacc').onchange = (e) => { sel.account = e.target.value; go(); }; $('lcat').onchange = (e) => { sel.category = e.target.value; go(); };
     $('lq').oninput = U.debounce((e) => { sel.q = e.target.value; go(); }, 280);
-    $('lin').onclick = () => ledgerModal({ direction: 'in', date: today(), amount_cents: 0 }, opts0, load);
-    $('lout').onclick = () => ledgerModal(null, opts0, load);
+    const curBiz = () => (sel.business ? +sel.business : homeId(opts0));
+    $('lin').onclick = () => ledgerModal({ direction: 'in', date: today(), amount_cents: 0, business_id: curBiz() }, opts0, load);
+    $('lout').onclick = () => ledgerModal({ direction: 'out', date: today(), amount_cents: 0, business_id: curBiz() }, opts0, load);
     $('lex').onclick = async () => {
       const [from, to] = rangeOf(sel.k, sel.custom, today());
-      try { const res = await fetch(B().getApi().base + `/admin/b/export?${new URLSearchParams({ kind: 'ledger', from: from === 'all' ? '' : from, to: to === 'all' ? '' : to })}`, { headers: { Authorization: 'Bearer ' + B().getApi().token() } }); if (!res.ok) throw new Error('Export failed'); U.download('ledger.xlsx', await res.blob()); } catch (x) { toast(x.message); }
+      try { const res = await fetch(B().getApi().base + `/admin/b/export?${new URLSearchParams({ kind: 'ledger', from: from === 'all' ? '' : from, to: to === 'all' ? '' : to, business: sel.business || '' })}`, { headers: { Authorization: 'Bearer ' + B().getApi().token() } }); if (!res.ok) throw new Error('Export failed'); U.download('ledger.xlsx', await res.blob()); } catch (x) { toast(x.message); }
     };
     go();
   });

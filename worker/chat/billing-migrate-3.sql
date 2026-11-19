@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS ledger (
   file_name TEXT,
   file_type TEXT,
   has_file INTEGER NOT NULL DEFAULT 0,        -- the file itself is kept in KV under ledger:file:<id>
+  business_id INTEGER,                        -- which business this entry belongs to (see ledger_businesses)
   created_by TEXT NOT NULL DEFAULT '',
   created INTEGER NOT NULL,
   updated INTEGER NOT NULL
@@ -29,6 +30,17 @@ CREATE TABLE IF NOT EXISTS ledger (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_src ON ledger(src, src_id) WHERE src IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_ledger_date ON ledger(date);
 CREATE INDEX IF NOT EXISTS idx_ledger_maaser_of ON ledger(maaser_of);
+CREATE INDEX IF NOT EXISTS idx_ledger_business ON ledger(business_id);
+
+-- One ledger can keep the books of several businesses. The home business (Everything Shul) is made automatically and receives invoice payments.
+CREATE TABLE IF NOT EXISTS ledger_businesses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#4986e7',
+  is_home INTEGER NOT NULL DEFAULT 0,
+  created INTEGER NOT NULL,
+  updated INTEGER NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS labels (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

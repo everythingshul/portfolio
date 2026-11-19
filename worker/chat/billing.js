@@ -719,7 +719,7 @@ export async function search(env, q) {
 }
 
 export async function wipeAll(env) {
-  const tables = ['activity', 'tasks', 'payments', 'invoice_lines', 'invoices', 'recurring', 'items', 'customers', 'ledger', 'label_links', 'labels', 'settings'];
+  const tables = ['activity', 'tasks', 'payments', 'invoice_lines', 'invoices', 'recurring', 'items', 'customers', 'ledger', 'ledger_businesses', 'label_links', 'labels', 'settings'];
   await batch(env, tables.map((t) => st(env, `DELETE FROM ${t}`)));
 }
 

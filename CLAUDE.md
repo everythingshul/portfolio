@@ -224,6 +224,11 @@ and footer.
    deleting that expense reverses it. Range chips: today, yesterday, 7/30 days, this/last month, this year, all time, custom; Excel export
    (`/admin/b/export?kind=ledger`). Payments -> "Take a payment" makes a one-line invoice (pay by emailed card link, or already received
    in person) so receipts, refunds, the pay page and the ledger all work; there is no card-on-file or text option here (this site has neither).
+   **Several businesses, one ledger (Everything Shul only, not in the Get A Bus NY copy):** table `ledger_businesses`, `ledger.business_id`.
+   The home business (named from the business name setting) is made automatically and always receives invoice payments; more are added
+   with Ledger -> Manage businesses (name, color, rename, delete only when empty). Chips above the ledger filter per business or All
+   businesses; totals, categories, balances by account and the Excel export follow the filter, and "All" shows a By business table.
+   New entries default to the business being viewed; a maaser charity expense stays with its income.
    **Labels** are Gmail-style: colored, nestable up to five levels ("Parent/Child" creates the path), shown as a Labels column plus a filter
    on invoice, quote, payment, customer and ledger lists, and a label bar on the invoice, customer and ledger-entry windows. Manage them in
    Billing -> Labels. Admin file/PDF links are opened with a fetch that sends the password header (a plain link can not).

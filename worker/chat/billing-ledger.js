@@ -15,9 +15,50 @@ export const localDate = (ms, tz) => {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(0, 10); }
 };
 
+// ---- businesses: one ledger can keep the books of several. The home business is made automatically and gets invoice payments.
+const BIZ_COLORS = ['#4986e7', '#16a765', '#ff7537', '#b99aff', '#f691b2', '#fad165', '#2da2bb', '#fb4c2f'];
+export async function ensureHome(env) {
+  let home = await one(env, 'SELECT * FROM ledger_businesses WHERE is_home = 1 ORDER BY id LIMIT 1');
+  if (!home) {
+    const s = await getSettings(env); const now = Date.now();
+    const id = (await run(env, `INSERT INTO ledger_businesses (name, color, is_home, created, updated) VALUES (?, ?, 1, ?, ?)`, line1(s.biz_name, 80) || 'My business', BIZ_COLORS[0], now, now)).meta.last_row_id;
+    home = await one(env, 'SELECT * FROM ledger_businesses WHERE id = ?', id);
+    await run(env, 'UPDATE ledger SET business_id = ? WHERE business_id IS NULL', id);   // entries made before there were businesses belong to the home business
+  }
+  return home;
+}
+export async function businessList(env) {
+  await ensureHome(env);
+  return all(env, `SELECT b.*, (SELECT COUNT(*) FROM ledger l WHERE l.business_id = b.id) AS entries FROM ledger_businesses b ORDER BY b.is_home DESC, LOWER(b.name), b.id`);
+}
+export async function saveBusiness(env, b) {
+  await ensureHome(env);
+  const name = line1(b.name, 80); if (!name) throw fail('Give the business a name.');
+  const color = /^#[0-9a-fA-F]{6}$/.test(String(b.color || '')) ? b.color.toLowerCase() : null;
+  const clash = await one(env, 'SELECT id FROM ledger_businesses WHERE LOWER(name) = LOWER(?)', name);
+  const now = Date.now();
+  if (b.id) {
+    const cur = await one(env, 'SELECT * FROM ledger_businesses WHERE id = ?', Number(b.id)); if (!cur) throw fail('Business not found', 404);
+    if (clash && clash.id !== cur.id) throw fail(`There is already a business called "${name}".`);
+    await run(env, 'UPDATE ledger_businesses SET name = ?, color = ?, updated = ? WHERE id = ?', name, color || cur.color, now, cur.id);
+    return one(env, 'SELECT * FROM ledger_businesses WHERE id = ?', cur.id);
+  }
+  if (clash) throw fail(`There is already a business called "${name}".`);
+  const n = (await one(env, 'SELECT COUNT(*) n FROM ledger_businesses')).n;
+  const id = (await run(env, 'INSERT INTO ledger_businesses (name, color, is_home, created, updated) VALUES (?, ?, 0, ?, ?)', name, color || BIZ_COLORS[n % BIZ_COLORS.length], now, now)).meta.last_row_id;
+  return one(env, 'SELECT * FROM ledger_businesses WHERE id = ?', id);
+}
+export async function deleteBusiness(env, id) {
+  const b = await one(env, 'SELECT * FROM ledger_businesses WHERE id = ?', id); if (!b) throw fail('Business not found', 404);
+  if (b.is_home) throw fail('This is the business that receives invoice payments, so it can not be deleted. You can rename it.');
+  const n = (await one(env, 'SELECT COUNT(*) n FROM ledger WHERE business_id = ?', id)).n;
+  if (n) throw fail(`${b.name} still has ${n} ledger entr${n === 1 ? 'y' : 'ies'}. Delete or move them first (open an entry and change its business).`);
+  await run(env, 'DELETE FROM ledger_businesses WHERE id = ?', id);
+}
+
 export async function ledgerOptions(env) {
   const s = await getSettings(env);
-  return { accounts: list(s.ledger_accounts), paid_with: list(s.ledger_paid_with), categories: list(s.ledger_categories), maaser_pct: MAASER_PCT, timezone: s.biz_timezone };
+  return { accounts: list(s.ledger_accounts), paid_with: list(s.ledger_paid_with), categories: list(s.ledger_categories), maaser_pct: MAASER_PCT, timezone: s.biz_timezone, businesses: await businessList(env) };
 }
 
 const METHODS = { stripe: 'Credit card (Stripe)', stripe_refund: 'Refund to card (Stripe)', cash: 'Cash', check: 'Check', zelle: 'Zelle', ach: 'ACH / bank transfer', wire: 'Wire', imported: 'Imported', other: 'Other' };
@@ -27,7 +68,7 @@ const accountFor = (m, accounts) => (m === 'stripe' || m === 'stripe_refund' ? '
 
 /** Mirror every payment and refund into the ledger (safe to call as often as you like). */
 export async function syncLedger(env) {
-  const s = await getSettings(env); const accounts = list(s.ledger_accounts);
+  const s = await getSettings(env); const accounts = list(s.ledger_accounts); const home = await ensureHome(env);
   // payments that were deleted take their ledger rows (and any maaser expense made from them) with them
   const gone = await all(env, `SELECT id FROM ledger WHERE src = 'payment' AND src_id NOT IN (SELECT id FROM payments)`);
   if (gone.length) {
@@ -40,11 +81,11 @@ export async function syncLedger(env) {
   for (let i = 0; i < rows.length; i += 40) {
     await batch(env, rows.slice(i, i + 40).map((p) => {
       const out = p.amount_cents < 0, cents = Math.abs(p.amount_cents);
-      return st(env, `INSERT OR IGNORE INTO ledger (date, direction, amount_cents, vendor, invoice_ref, description, paid_with, account, notes, category, maaser_cents, src, src_id, invoice_id, customer_id, created_by, created, updated)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?, 'payment', ?, ?, ?, 'system', ?, ?)`,
+      return st(env, `INSERT OR IGNORE INTO ledger (date, direction, amount_cents, vendor, invoice_ref, description, paid_with, account, notes, category, maaser_cents, src, src_id, invoice_id, customer_id, business_id, created_by, created, updated)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?, 'payment', ?, ?, ?, ?, 'system', ?, ?)`,
       localDate(p.received_at, s.biz_timezone), out ? 'out' : 'in', cents, p.corg || p.cname || '', p.inv_no || '', out ? `Refund: ${p.inv_title || p.inv_no}` : p.inv_title || 'Payment',
       methodLabel(p.method), accountFor(p.method, accounts), [p.ref ? `Ref: ${p.ref}` : '', p.note || ''].filter(Boolean).join('. '), out ? 'Refunds' : 'Sales', out ? 0 : maaserFor(cents),
-      p.id, p.invoice_id, p.customer_id || null, p.created || now, now);
+      p.id, p.invoice_id, p.customer_id || null, home.id, p.created || now, now);
     }));
   }
   return rows.length;
@@ -60,6 +101,7 @@ export async function ledgerList(env, p) {
   if (validDate(p.from)) { w.push('date >= ?'); a.push(p.from); }
   if (validDate(p.to)) { w.push('date <= ?'); a.push(p.to); }
   if (p.direction === 'in' || p.direction === 'out') { w.push('direction = ?'); a.push(p.direction); }
+  const biz = Number(p.business) || 0; if (biz) { w.push('business_id = ?'); a.push(biz); }
   if (p.account) { w.push('account = ?'); a.push(p.account); }
   if (p.category) { w.push('category = ?'); a.push(p.category); }
   if (p.q) { w.push(`(vendor LIKE ? ESCAPE '\\' OR invoice_ref LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\' OR account LIKE ? ESCAPE '\\' OR paid_with LIKE ? ESCAPE '\\')`); const x = '%' + String(p.q).replace(/[%_\\]/g, (c) => '\\' + c) + '%'; a.push(x, x, x, x, x, x); }
@@ -69,8 +111,9 @@ export async function ledgerList(env, p) {
     COALESCE(SUM(CASE WHEN direction='in' THEN maaser_cents END),0) maaser, COALESCE(SUM(CASE WHEN direction='in' AND maaser_given=0 THEN maaser_cents END),0) maaser_owed,
     COALESCE(SUM(CASE WHEN direction='in' AND maaser_given=1 THEN maaser_cents END),0) maaser_given FROM ledger${where}`, ...a);
   const byCategory = await all(env, `SELECT COALESCE(NULLIF(category,''),'(none)') k, direction, SUM(amount_cents) c, COUNT(*) n FROM ledger${where} GROUP BY k, direction ORDER BY c DESC`, ...a);
-  const balances = await all(env, `SELECT COALESCE(NULLIF(account,''),'(no account)') k, SUM(CASE direction WHEN 'in' THEN amount_cents ELSE -amount_cents END) net, COUNT(*) n FROM ledger GROUP BY k ORDER BY net DESC`);
-  return { rows, totals: { entries: t.n, money_in: t.money_in, money_out: t.money_out, net: t.money_in - t.money_out, maaser: t.maaser, maaser_owed: t.maaser_owed, maaser_given: t.maaser_given }, byCategory, balances, options: await ledgerOptions(env) };
+  const balances = await all(env, `SELECT COALESCE(NULLIF(account,''),'(no account)') k, SUM(CASE direction WHEN 'in' THEN amount_cents ELSE -amount_cents END) net, COUNT(*) n FROM ledger${biz ? ' WHERE business_id = ?' : ''} GROUP BY k ORDER BY net DESC`, ...(biz ? [biz] : []));
+  const byBusiness = await all(env, `SELECT business_id id, COALESCE(SUM(CASE WHEN direction='in' THEN amount_cents END),0) money_in, COALESCE(SUM(CASE WHEN direction='out' THEN amount_cents END),0) money_out, COUNT(*) n FROM ledger${where} GROUP BY business_id`, ...a);
+  return { rows, totals: { entries: t.n, money_in: t.money_in, money_out: t.money_out, net: t.money_in - t.money_out, maaser: t.maaser, maaser_owed: t.maaser_owed, maaser_given: t.maaser_given }, byCategory, balances, byBusiness, options: await ledgerOptions(env) };
 }
 
 const cleanEntry = (b, locked) => {
@@ -83,6 +126,7 @@ const cleanEntry = (b, locked) => {
     if ('amount_cents' in b) { const c = Math.round(Number(b.amount_cents)); if (!Number.isFinite(c) || c <= 0 || c > 10_000_000_000) throw fail('Enter an amount greater than zero.'); o.amount_cents = c; }
     if ('date' in b) { if (!validDate(b.date)) throw fail('Enter a date.'); o.date = b.date; }
     for (const k of ['customer_id', 'invoice_id']) if (k in b) o[k] = b[k] ? String(b[k]).slice(0, 40) : null;
+    if ('business_id' in b) o.business_id = Number(b.business_id) || null;
   }
   return o;
 };
@@ -93,6 +137,8 @@ export async function ledgerCreate(env, b, actor) {
   const o = cleanEntry({ ...b, date: b.date || localDate(Date.now(), s.biz_timezone) }, false);
   if (!o.direction || !o.amount_cents) throw fail('Enter an amount and choose money in or money out.');
   if (o.invoice_id) { const i = await one(env, 'SELECT number, customer_id FROM invoices WHERE id = ?', o.invoice_id); if (!i) throw fail('That invoice does not exist.'); o.invoice_ref = o.invoice_ref || i.number; o.customer_id = o.customer_id || i.customer_id; }
+  o.business_id = o.business_id || (await ensureHome(env)).id;
+  if (!(await one(env, 'SELECT 1 x FROM ledger_businesses WHERE id = ?', o.business_id))) throw fail('Choose a business.');
   o.maaser_cents = o.direction === 'in' ? maaserFor(o.amount_cents) : 0;
   const now = Date.now();
   const cols = { vendor: '', invoice_ref: '', description: '', paid_with: '', account: '', notes: '', category: '', invoice_id: null, customer_id: null, ...o, created_by: actor || 'admin', created: now, updated: now };
@@ -107,12 +153,14 @@ export async function ledgerCreate(env, b, actor) {
 export async function ledgerUpdate(env, id, b, actor) {
   const r = await get(env, id); if (!r) throw fail('Not found', 404);
   const o = cleanEntry(b, r.src === 'payment');
+  if ('business_id' in o) { if (!o.business_id || !(await one(env, 'SELECT 1 x FROM ledger_businesses WHERE id = ?', o.business_id))) throw fail('Choose a business.'); }
   const dir = o.direction || r.direction, amt = o.amount_cents || r.amount_cents;
   if (o.direction || o.amount_cents) o.maaser_cents = dir === 'in' ? maaserFor(amt) : 0;
   if (Object.keys(o).length) await run(env, `UPDATE ledger SET ${setCols(o)}, updated = ? WHERE id = ?`, ...Object.values(o), Date.now(), id);
   const linked = await one(env, 'SELECT id FROM ledger WHERE maaser_of = ?', id);
   if (linked && dir === 'out') { await run(env, 'DELETE FROM ledger WHERE maaser_of = ?', id); await run(env, 'UPDATE ledger SET maaser_given = 0, maaser_given_at = NULL WHERE id = ?', id); }
   else if (linked && o.maaser_cents != null) await run(env, 'UPDATE ledger SET amount_cents = ?, updated = ? WHERE id = ?', o.maaser_cents, Date.now(), linked.id);
+  if (linked && o.business_id) await run(env, 'UPDATE ledger SET business_id = ? WHERE id = ?', o.business_id, linked.id);   // the charity expense stays with its income
   return shape(await get(env, id));
 }
 
@@ -137,8 +185,8 @@ export async function ledgerMaaser(env, id, given, actor) {
   const existing = await one(env, 'SELECT id FROM ledger WHERE maaser_of = ?', id);
   const s = await getSettings(env); const now = Date.now();
   if (given && !existing) {
-    await run(env, `INSERT INTO ledger (date, direction, amount_cents, vendor, description, category, notes, maaser_of, created_by, created, updated) VALUES (?, 'out', ?, 'Charity (maaser)', ?, 'Maaser', ?, ?, ?, ?, ?)`,
-      localDate(now, s.biz_timezone), r.maaser_cents, `Maaser on ${r.description || r.invoice_ref || 'income'}`, `Ten percent of ${money(r.amount_cents)} received ${r.date}`, id, actor || 'admin', now, now);
+    await run(env, `INSERT INTO ledger (date, direction, amount_cents, vendor, description, category, notes, maaser_of, business_id, created_by, created, updated) VALUES (?, 'out', ?, 'Charity (maaser)', ?, 'Maaser', ?, ?, ?, ?, ?, ?)`,
+      localDate(now, s.biz_timezone), r.maaser_cents, `Maaser on ${r.description || r.invoice_ref || 'income'}`, `Ten percent of ${money(r.amount_cents)} received ${r.date}`, id, r.business_id || (await ensureHome(env)).id, actor || 'admin', now, now);
   } else if (!given && existing) await run(env, 'DELETE FROM ledger WHERE id = ?', existing.id);
   await run(env, 'UPDATE ledger SET maaser_given = ?, maaser_given_at = ?, updated = ? WHERE id = ?', given ? 1 : 0, given ? now : null, now, id);
   return shape(await get(env, id));
@@ -173,13 +221,15 @@ export async function ledgerRemoveFile(env, id) {
   await run(env, 'UPDATE ledger SET has_file = 0, file_name = NULL, file_type = NULL, updated = ? WHERE id = ?', Date.now(), id);
 }
 
-export async function ledgerExport(env, from, to) {
+export async function ledgerExport(env, from, to, business) {
   await syncLedger(env);
   const f = validDate(from) ? from : '0000-01-01', t = validDate(to) ? to : '9999-12-31';
-  const rows = await all(env, 'SELECT * FROM ledger WHERE date >= ? AND date <= ? ORDER BY date, id', f, t);
+  const biz = Number(business) || 0;
+  const rows = await all(env, `SELECT * FROM ledger WHERE date >= ? AND date <= ?${biz ? ' AND business_id = ?' : ''} ORDER BY date, id`, f, t, ...(biz ? [biz] : []));
+  const names = Object.fromEntries((await all(env, 'SELECT id, name FROM ledger_businesses')).map((x) => [x.id, x.name]));
   const labelsBy = await labelPathsFor(env, 'ledger');
-  return { name: 'Ledger', cols: [{ h: 'Date', t: 'date' }, { h: 'Vendor' }, { h: 'Invoice #' }, { h: 'Description', w: 36 }, { h: 'Amount', t: 'money' }, { h: 'Paid with' }, { h: 'Account' }, { h: 'Notes', w: 36 }, { h: 'Maaser (10%)', t: 'money' }, { h: 'Maaser given' }, { h: 'Type' }, { h: 'Category' }, { h: 'Labels', w: 24 }, { h: 'Attachment' }],
-    rows: rows.map((x) => [x.date, x.vendor, x.invoice_ref, x.description, (x.direction === 'out' ? -x.amount_cents : x.amount_cents) / 100, x.paid_with, x.account, x.notes, (x.direction === 'in' ? x.maaser_cents : 0) / 100,
+  return { name: 'Ledger', cols: [{ h: 'Date', t: 'date' }, { h: 'Business' }, { h: 'Vendor' }, { h: 'Invoice #' }, { h: 'Description', w: 36 }, { h: 'Amount', t: 'money' }, { h: 'Paid with' }, { h: 'Account' }, { h: 'Notes', w: 36 }, { h: 'Maaser (10%)', t: 'money' }, { h: 'Maaser given' }, { h: 'Type' }, { h: 'Category' }, { h: 'Labels', w: 24 }, { h: 'Attachment' }],
+    rows: rows.map((x) => [x.date, names[x.business_id] || '', x.vendor, x.invoice_ref, x.description, (x.direction === 'out' ? -x.amount_cents : x.amount_cents) / 100, x.paid_with, x.account, x.notes, (x.direction === 'in' ? x.maaser_cents : 0) / 100,
       x.direction === 'in' ? (x.maaser_given ? 'Yes' : 'No') : '', x.direction === 'out' ? 'Money out' : 'Money in', x.category, labelsBy[x.id] || '', x.file_name ? x.file_name : x.invoice_id ? `Invoice ${x.invoice_ref}` : '']) };
 }
 
