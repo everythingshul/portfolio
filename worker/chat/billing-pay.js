@@ -328,4 +328,4 @@ export async function billingDaily(env) {
   return { recurring: made, reminders: reminded };
 }
 
-export { line1, clean, refreshPaid };
+export { line1, clean, refreshPaid, afterPayment };

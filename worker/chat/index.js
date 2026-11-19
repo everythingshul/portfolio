@@ -39,7 +39,7 @@ const origins = (env) => (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.tri
 const corsHeaders = (origin, env) => ({
   'Access-Control-Allow-Origin': origins(env).includes(origin) ? origin : 'null',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-File-Name',
   Vary: 'Origin',
 });
 const json = (body, status, headers) =>

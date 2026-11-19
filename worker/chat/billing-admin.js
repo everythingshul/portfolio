@@ -2,6 +2,7 @@
 import * as B from './billing.js';
 import { sendInvoice, stripeStatus, refundPayment } from './billing-pay.js';
 import { buildXlsx, XLSX_TYPE } from './xlsx.js';
+import * as G from './billing-ledger.js';
 
 const need = (v, what) => { if (!v) throw B.fail(`Missing ${what}`); return v; };
 
@@ -28,15 +29,33 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
         case 'recurring': return json({ recurring: await B.listRecurring(env) }, 200, h);
         case 'reports': return json(await B.reports(env, q.from, q.to, q), 200, h);
         case 'search': return json(await B.search(env, q.q), 200, h);
+        case 'ledger': return json(await G.ledgerList(env, q), 200, h);
+        case 'ledger/options': return json(await G.ledgerOptions(env), 200, h);
+        case 'ledger/file': {
+          const f = await G.ledgerFile(env, need(q.id, 'id'));
+          if (!f) return json({ error: 'No file attached.' }, 404, h);
+          return new Response(f.buf, { status: 200, headers: { ...h, 'Content-Type': f.type, 'Content-Disposition': `inline; filename="${f.name.replace(/[^\x20-\x7E]/g, '_')}"`, 'Cache-Control': 'no-store' } });
+        }
+        case 'invoice/pdf': {
+          const pdf = await G.invoicePdf(env, need(q.id, 'id'));
+          const num = (await B.getInvoice(env, q.id)).invoice.number;
+          return new Response(pdf, { status: 200, headers: { ...h, 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${String(num).replace(/[^A-Za-z0-9._-]/g, '_')}.pdf"`, 'Cache-Control': 'no-store' } });
+        }
+        case 'labels': return json({ labels: await G.allLabels(env), links: await G.allLinks(env), palette: G.PALETTE, types: G.LABEL_TYPES }, 200, h);
         case 'export': {
-          const kind = ['customers', 'payments'].includes(q.kind) ? q.kind : 'invoices';
-          const sheet = await B.exportData(env, kind, q.from, q.to);
+          const kind = ['customers', 'payments', 'ledger'].includes(q.kind) ? q.kind : 'invoices';
+          const sheet = kind === 'ledger' ? await G.ledgerExport(env, q.from, q.to) : await B.exportData(env, kind, q.from, q.to);
           return new Response(buildXlsx([sheet]), { status: 200, headers: { ...h, 'Content-Type': XLSX_TYPE, 'Content-Disposition': `attachment; filename="${kind}.xlsx"`, 'Cache-Control': 'no-store' } });
         }
         default: return json({ error: 'Not found' }, 404, h);
       }
     }
     if (request.method !== 'POST') return json({ error: 'Not found' }, 404, h);
+    if (path === 'ledger/file') {   // the file itself is the request body; the entry id is in the address
+      let name = ''; try { name = decodeURIComponent(request.headers.get('x-file-name') || ''); } catch { /* ignore */ }
+      await G.ledgerAttach(env, Number(need(sp.get('id'), 'id')), await request.arrayBuffer(), name);
+      return json({ ok: true }, 200, h);
+    }
     let b;
     try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400, h); }
     switch (path) {
@@ -78,6 +97,21 @@ export async function billingAdmin(request, url, env, h, json, getChats) {
       }
       case 'import/customers': return json(await B.importCustomers(env, Array.isArray(b.rows) ? b.rows : [], b.mode, !!b.dry), 200, h);
       case 'import/invoices': return json(await B.importInvoices(env, Array.isArray(b.rows) ? b.rows : [], { source: b.source }, !!b.dry), 200, h);
+      case 'ledger/save': {
+        const actor = 'admin';
+        const row = b.id ? await G.ledgerUpdate(env, Number(b.id), b, actor) : await G.ledgerCreate(env, b, actor);
+        return json(row, 200, h);
+      }
+      case 'ledger/delete': await G.ledgerDelete(env, Number(need(b.id, 'id'))); return json({ ok: true }, 200, h);
+      case 'ledger/maaser': return json(await G.ledgerMaaser(env, Number(need(b.id, 'id')), !!b.given, 'admin'), 200, h);
+      case 'ledger/file-remove': await G.ledgerRemoveFile(env, Number(need(b.id, 'id'))); return json({ ok: true }, 200, h);
+      case 'payment/quick': return json(await G.quickPayment(env, b), 200, h);
+      case 'label/save': {
+        const row = b.id ? await G.updateLabel(env, Number(b.id), b) : await G.createLabel(env, b);
+        return json(row, 200, h);
+      }
+      case 'label/delete': await G.deleteLabel(env, Number(need(b.id, 'id'))); return json({ ok: true }, 200, h);
+      case 'label/assign': return json({ label_ids: await G.setLabels(env, String(b.type || ''), need(b.id, 'id'), b.label_ids) }, 200, h);
       case 'cleanup': return json(await B.cleanImported(env), 200, h);
       case 'wipe':
         if (b.confirm !== 'DELETE EVERYTHING') throw B.fail('Type DELETE EVERYTHING to confirm.');
