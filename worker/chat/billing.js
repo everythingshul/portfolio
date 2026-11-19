@@ -42,6 +42,10 @@ export const DEFAULTS = {
   biz_name: 'Everything Shul', biz_address: '', biz_email: '', biz_phone: '', biz_taxid: '', logo_url: '',
   invoice_prefix: 'INV-', quote_prefix: 'Q-', next_invoice: '1001', next_quote: '1001',
   stripe_pk: '', invoice_pad: '0', terms_days: '30', quote_days: '30', tax_rate: '0', notes: '', terms: '', currency: 'usd', reminders: '1',
+  biz_timezone: 'America/New_York',
+  ledger_accounts: 'Stripe,Business checking,Cash,Business credit card',
+  ledger_paid_with: 'Credit card,Check,Cash,Zelle,ACH / bank transfer,Wire',
+  ledger_categories: 'Sales,Refunds,Software and hosting,Email and text services,Payment processing fees,Office and equipment,Marketing,Contractors,Payroll,Taxes,Maaser,Other',
 };
 const TEXT_LIMITS = { biz_name: 120, biz_address: 400, biz_email: 200, biz_phone: 60, biz_taxid: 60, logo_url: 500, invoice_prefix: 12, quote_prefix: 12, notes: 1500, terms: 1500, currency: 3 };
 
@@ -64,6 +68,8 @@ export async function saveSettings(env, b) {
     else if (k === 'invoice_pad') v = String(int(v, 0, 12));
     else if (k === 'stripe_pk') { v = clean(v, 200); if (v && !/^pk_(live|test)_[A-Za-z0-9]+$/.test(v)) throw fail('That does not look like a Stripe publishable key. It starts with pk_live_ or pk_test_.'); }
     else if (k === 'tax_rate') v = String(Math.max(0, Math.min(100, Number(v) || 0)));
+    else if (k === 'biz_timezone') { v = clean(v, 60); try { new Intl.DateTimeFormat('en-US', { timeZone: v }); } catch { throw fail('That is not a time zone name. Use a name like America/New_York.'); } }
+    else if (['ledger_accounts', 'ledger_paid_with', 'ledger_categories'].includes(k)) v = String(v || '').split(',').map((x) => clean(x, 60)).filter(Boolean).join(',').slice(0, 1200);
     else if (k === 'reminders') v = v === true || v === '1' || v === 1 ? '1' : '0';
     else if (k === 'currency') { v = clean(v, 3).toLowerCase(); if (!/^[a-z]{3}$/.test(v)) v = 'usd'; }
     else if (k === 'logo_url') { v = clean(v, 500); if (v && !/^https:\/\//.test(v)) throw fail('The logo address must start with https://'); }
@@ -713,7 +719,7 @@ export async function search(env, q) {
 }
 
 export async function wipeAll(env) {
-  const tables = ['activity', 'tasks', 'payments', 'invoice_lines', 'invoices', 'recurring', 'items', 'customers', 'settings'];
+  const tables = ['activity', 'tasks', 'payments', 'invoice_lines', 'invoices', 'recurring', 'items', 'customers', 'ledger', 'ledger_businesses', 'label_links', 'labels', 'settings'];
   await batch(env, tables.map((t) => st(env, `DELETE FROM ${t}`)));
 }
 
@@ -757,3 +763,6 @@ export async function cleanImported(env) {
   }
   return out;
 }
+
+// shared with the ledger and labels modules
+export { all, one, run, st, batch };

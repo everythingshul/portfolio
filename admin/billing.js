@@ -9,7 +9,7 @@
   let settings = null;
   const st = { ov: { key: '30d', from: '', to: '' }, view: 'overview', inv: { status: '', q: '', from: '', to: '' }, quo: { status: '', q: '' }, pay: { q: '', from: '', to: '', method: '' }, rep: { from: '', to: '' } };
 
-  const VIEWS = [['overview', 'Overview'], ['invoices', 'Invoices'], ['quotes', 'Quotes'], ['recurring', 'Repeating'], ['payments', 'Payments'], ['items', 'Items'], ['reports', 'Reports'], ['import', 'Import'], ['settings', 'Settings']];
+  const VIEWS = [['overview', 'Overview'], ['invoices', 'Invoices'], ['quotes', 'Quotes'], ['recurring', 'Repeating'], ['payments', 'Payments'], ['ledger', 'Ledger'], ['items', 'Items'], ['reports', 'Reports'], ['labels', 'Labels'], ['import', 'Import'], ['settings', 'Settings']];
   const who = (r) => r.customer_org || r.customer_name || r.org || r.name || '';
   const loadSettings = async (force) => { if (!settings || force) settings = (await api('/admin/b/settings')).settings; return settings; };
   const METHODS = [['stripe', 'Online (Stripe)'], ['check', 'Check'], ['cash', 'Cash'], ['ach', 'Bank transfer'], ['zelle', 'Zelle'], ['other', 'Other'], ['imported', 'Imported'], ['stripe_refund', 'Stripe refund']];
@@ -117,7 +117,7 @@
       const body = $('l-body');
       const d = await api('/admin/b/invoices?' + new URLSearchParams({ kind, status: q.status, q: q.q, from: q.from || '', to: q.to || '' }));
       if (!d.invoices.length) { body.innerHTML = `<div class="aempty">${q.status || q.q ? 'Nothing matches.' : `No ${kind}s yet. Create your first one, or import them from Wix.`}</div>`; return; }
-      body.innerHTML = table(['Number', 'Customer', 'Date', kind === 'quote' ? 'Valid until' : 'Due', '>Total', ...(kind === 'invoice' ? ['>Balance'] : []), 'Status'], d.invoices.map((i) => `<tr data-inv="${esc(i.id)}"><td><strong>${esc(i.number)}</strong></td><td>${esc(who(i))}</td><td>${esc(fmtDate(i.issue_date))}</td><td>${esc(fmtDate(i.due_date))}</td><td class="n">${esc(money(i.total, i.currency))}</td>${kind === 'invoice' ? `<td class="n">${['draft', 'void'].includes(i.state) ? '—' : esc(money(i.balance, i.currency))}</td>` : ''}<td>${badge(i.state)}</td></tr>`), true)
+      body.innerHTML = table(['Number', 'Customer', 'Date', kind === 'quote' ? 'Valid until' : 'Due', '>Total', ...(kind === 'invoice' ? ['>Balance'] : []), 'Status'], d.invoices.map((i) => `<tr data-inv="${esc(i.id)}" data-lbl="${kind}:${esc(i.id)}"><td><strong>${esc(i.number)}</strong></td><td>${esc(who(i))}</td><td>${esc(fmtDate(i.issue_date))}</td><td>${esc(fmtDate(i.due_date))}</td><td class="n">${esc(money(i.total, i.currency))}</td>${kind === 'invoice' ? `<td class="n">${['draft', 'void'].includes(i.state) ? '—' : esc(money(i.balance, i.currency))}</td>` : ''}<td>${badge(i.state)}</td></tr>`), true)
         + `<p class="anote">${d.summary.n} ${kind}${d.summary.n === 1 ? '' : 's'} · ${esc(money(d.summary.total))} total${kind === 'invoice' ? ` · ${esc(money(d.summary.balance))} still owed` : ''}</p>`;
       body.querySelectorAll('tr[data-inv]').forEach((r) => r.addEventListener('click', () => go(r.dataset.inv)));
     }
@@ -164,6 +164,7 @@
     if (!['void'].includes(i.status) && !(i.paid > 0)) a.push(btn('void', 'Void', 'danger'));
     if (['draft', 'void'].includes(i.status)) a.push(btn('delete', 'Delete', 'danger'));
     el.innerHTML = `<div class="pagehead no-print"><button class="small-btn" id="back">← ${q ? 'Quotes' : 'Invoices'}</button><div class="titleblock"><h2>${q ? 'Quote' : 'Invoice'} ${esc(i.number)}</h2>${badge(i.state)}</div><span class="grow"></span><a href="#customer=${esc(c.id)}" class="small-btn" id="tocust">${esc(c.org || c.name)} →</a></div>
+      <div id="lblbar" class="lblbar no-print"></div>
       <div class="split inv-split"><div class="main"><div class="docwrap">${Doc.render(docData(d, s))}</div></div>
       <aside class="side no-print"><section class="acard"><h3>Actions</h3><div class="actions-col">${a.join('')}</div></section>
         ${!q && i.status !== 'draft' && i.status !== 'void' ? `<section class="acard"><h3>Payments</h3>${d.payments.length ? d.payments.map((p) => { const back = d.payments.filter((x) => x.method === 'stripe_refund' && x.ref && x.ref === p.ref).reduce((a, x) => a - x.amount_cents, 0); const left = p.amount_cents - back; return `<div class="line"><span>${esc(U.fmtDay(p.received_at))} · ${esc(methodName(p.method))}${p.ref && p.method !== 'stripe' && p.method !== 'stripe_refund' ? ` <small>${esc(p.ref)}</small>` : ''}</span><span class="pr"><strong>${esc(money(p.amount_cents, i.currency))}</strong>${p.method === 'stripe' && left > 0 ? `<button class="small-btn" data-refund="${esc(p.id)}" data-left="${left}" title="Send money back to the customer's card">Refund</button>` : ''}${p.method === 'stripe' || p.method === 'stripe_refund' ? '' : `<button class="x" data-delpay="${esc(p.id)}" aria-label="Remove payment" title="Remove this payment record">×</button>`}</span></div>`; }).join('') : '<div class="subtle">No payments yet.</div>'}
@@ -188,6 +189,7 @@
       decline: async () => { await api('/admin/b/invoice/status', { method: 'POST', body: { id, action: 'decline' } }); openInvoice(id); },
     };
     el.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', async () => { try { await act[b.dataset.a](); } catch (e) { toast(e.message); } }));
+    if (window.ESLabels) window.ESLabels.bar($('lblbar'), q ? 'quote' : 'invoice', i.id);
     el.querySelectorAll('[data-delpay]').forEach((b) => b.addEventListener('click', async () => { if (await U.ask('Remove this payment record?', 'The invoice balance goes back up.', 'Remove', true)) { try { await api('/admin/b/payment/delete', { method: 'POST', body: { id: b.dataset.delpay } }); openInvoice(id); } catch (e) { toast(e.message); } } }));
     const op = $('onlinepay'); if (op) op.addEventListener('change', async () => { try { await api('/admin/b/invoice/online-pay', { method: 'POST', body: { id, on: op.checked } }); toast(op.checked ? 'Customer can pay online' : 'Online payment turned off for this invoice'); openInvoice(id); } catch (e) { toast(e.message); op.checked = !op.checked; } });
     el.querySelectorAll('[data-refund]').forEach((b) => b.addEventListener('click', () => refundForm(d, b.dataset.refund, +b.dataset.left, () => openInvoice(id))));
@@ -411,16 +413,17 @@
   VIEW.payments = async (el) => {
     const q = st.pay;
     el.innerHTML = `<div class="toolbar"><input type="search" id="p-q" placeholder="Search customer or invoice…" value="${esc(q.q)}"><input type="date" id="p-from" value="${esc(q.from)}" aria-label="From"><span class="subtle">to</span><input type="date" id="p-to" value="${esc(q.to)}" aria-label="To">
-      <select id="p-m"><option value="">All methods</option>${METHODS.map(([k, l]) => `<option value="${k}"${q.method === k ? ' selected' : ''}>${l}</option>`).join('')}</select><span class="grow"></span><button class="small-btn" id="p-export">Export to Excel</button></div><div id="p-body"></div>`;
+      <select id="p-m"><option value="">All methods</option>${METHODS.map(([k, l]) => `<option value="${k}"${q.method === k ? ' selected' : ''}>${l}</option>`).join('')}</select><span class="grow"></span><button class="small-btn primary" id="p-take">Take a payment</button><button class="small-btn" id="p-export">Export to Excel</button></div><div id="p-body"></div>`;
     const fetchIt = async () => {
       q.q = $('p-q').value.trim(); q.from = $('p-from').value; q.to = $('p-to').value; q.method = $('p-m').value;
       const d = await api('/admin/b/payments?' + new URLSearchParams({ ...q, tz: new Date().getTimezoneOffset() }));
-      $('p-body').innerHTML = table(['Date', 'Customer', 'Invoice', 'Method', 'Reference', '>Amount'], d.payments.map((p) => `<tr data-inv="${esc(p.invoice_id)}"><td>${esc(U.fmtDay(p.received_at))}</td><td>${esc(who(p))}</td><td>${esc(p.invoice_number || '')}</td><td>${esc(methodName(p.method))}</td><td>${esc(p.ref || '')}</td><td class="n">${esc(money(p.amount_cents))}</td></tr>`), true) + `<p class="anote">${d.summary.n} payment${d.summary.n === 1 ? '' : 's'} · ${esc(money(d.summary.s))} net</p>`;
+      $('p-body').innerHTML = table(['Date', 'Customer', 'Invoice', 'Method', 'Reference', '>Amount'], d.payments.map((p) => `<tr data-inv="${esc(p.invoice_id)}" data-lbl="payment:${esc(p.id)}"><td>${esc(U.fmtDay(p.received_at))}</td><td>${esc(who(p))}</td><td>${esc(p.invoice_number || '')}</td><td>${esc(methodName(p.method))}</td><td>${esc(p.ref || '')}</td><td class="n">${esc(money(p.amount_cents))}</td></tr>`), true) + `<p class="anote">${d.summary.n} payment${d.summary.n === 1 ? '' : 's'} · ${esc(money(d.summary.s))} net</p>`;
       $('p-body').querySelectorAll('tr[data-inv]').forEach((r) => r.addEventListener('click', () => go(r.dataset.inv)));
     };
     const d = U.debounce(fetchIt, 250);
     ['p-q', 'p-from', 'p-to', 'p-m'].forEach((id) => $(id).addEventListener(id === 'p-q' ? 'input' : 'change', d));
     $('p-export').addEventListener('click', () => exportCsv('payments', $('p-from').value, $('p-to').value));
+    $('p-take').addEventListener('click', () => window.ESLedger.takePayment(fetchIt));
     await fetchIt();
   };
 
@@ -555,7 +558,8 @@
       ${card('Your business (shown on every invoice)', `${f('biz_name', 'Business name', 'text', '', 'maxlength="120"')}<label class="f"><span>Address</span><textarea name="biz_address" rows="3" maxlength="400">${esc(s.biz_address)}</textarea></label><div class="grid2">${f('biz_email', 'Email', 'email', 'Replies to invoices go here')}${f('biz_phone', 'Phone')}</div>${f('biz_taxid', 'Tax ID / EIN (optional)')}<label class="f"><span>Logo address</span><input name="logo_url" type="url" value="${esc(/\/assets\/logo\.png$/.test(s.logo_url) ? '' : s.logo_url)}" placeholder="Empty = the website logo"><small>A web address starting with https://</small></label>`)}
       ${card('Numbering and defaults', `<div class="grid2">${f('invoice_prefix', 'Invoice number prefix')}${f('next_invoice', 'Next invoice number', 'number', '', 'min="1"')}${f('quote_prefix', 'Quote number prefix')}${f('next_quote', 'Next quote number', 'number', '', 'min="1"')}${f('invoice_pad', 'Pad numbers to this many digits', 'number', 'e.g. 7 gives 0003114. 0 = no padding', 'min="0" max="12"')}${f('terms_days', 'Payment due after (days)', 'number', '', 'min="0"')}${f('tax_rate', 'Default tax rate (%)', 'text')}</div>
         <label class="f"><span>Default message on invoices</span><textarea name="notes" rows="2" maxlength="1500">${esc(s.notes)}</textarea></label><label class="f"><span>Default terms</span><textarea name="terms" rows="2" maxlength="1500">${esc(s.terms)}</textarea></label>
-        <label class="check pad"><input type="checkbox" name="reminders" ${s.reminders === '1' ? 'checked' : ''}> Send automatic payment reminders (3 days before the due date, on the day, then 7, 14 and 30 days late)</label>`)}</div>
+        <label class="check pad"><input type="checkbox" name="reminders" ${s.reminders === '1' ? 'checked' : ''}> Send automatic payment reminders (3 days before the due date, on the day, then 7, 14 and 30 days late)</label>`)}
+      ${card('Ledger', `${f('ledger_accounts', 'Accounts', 'text', 'Separated by commas, e.g. Stripe, Business checking, Cash')}${f('ledger_paid_with', 'Ways of paying', 'text', 'Separated by commas')}${f('ledger_categories', 'Categories', 'text', 'Separated by commas')}${f('biz_timezone', 'Business time zone', 'text', 'Dates in the ledger follow this clock, e.g. America/New_York')}`)}</div>
       <div class="row"><button class="small-btn primary" type="submit">Save settings</button><span id="s-msg" class="subtle"></span></div></form>
       ${card('Online payments (Stripe)', '<div id="stripe-box"><div class="subtle">Checking…</div></div>', 'wide')}
       ${card('Clean up imported data', `<p class="anote">If names or invoice numbers show up like <code>="Dov Brieger"</code> after an import, this fixes them, fills in an email when the name was really an email address, and merges customers that are exact duplicates (same email, or same name with no email). Invoices are never deleted; they move to the customer that is kept.</p><button class="small-btn" id="cleanup">Fix imported names and numbers</button> <span class="subtle" id="cleanup-msg"></span>`, 'wide')}
@@ -601,5 +605,10 @@
     openInvoice: (id) => openInvoice(id),
     openImport(kind) { st.view = 'import'; window.ESAdmin.setTab('billing', true); chrome(); VIEW.import($('b-body'), kind); },
     setApi(a) { api = a; },
+    // the ledger and labels live in ledger.js and plug their views in here
+    defineView(key, fn) { VIEW[key] = fn; },
+    getApi: () => api,
+    getSettings: loadSettings,
+    refresh: () => { chrome(); draw(); },
   };
 })();

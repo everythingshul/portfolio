@@ -267,6 +267,28 @@
   .modal .x { border: 0; background: transparent; color: var(--ink-3); font-size: 1.15rem; cursor: pointer; } .modal .x:hover { color: #ff8a80; }
   .modal .tscroll { overflow-x: auto; }
   @media (max-width: 960px) { .split, .inv-split { grid-template-columns: 1fr; } }
+  /* ledger */
+  .led-in { color: #6fd08c; font-weight: 600; } .led-out { color: #ef7a6f; font-weight: 600; }
+  label.mz { display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; cursor: pointer; } label.mz input { width: auto; min-height: 0; } label.mz small { color: var(--ink-3); font-size: 0.7rem; width: 100%; text-align: right; }
+  .linkbtn { border: 0; background: transparent; color: var(--cyan-ink); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+  input[type=radio] { width: auto; min-height: 0; flex: none; }
+  .ax .led-row { cursor: pointer; } .ax .custom { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .ax .toolbar select, .ax .toolbar input[type=search] { width: auto; min-width: 160px; }
+  /* labels */
+  .lbl { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; line-height: 1.5; margin: 1px 4px 1px 0; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+  .lblbar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 0 0 12px; }
+  .modal .lblbar { padding: 0 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .lblpick { position: fixed; z-index: 400; width: 290px; max-height: 70vh; overflow: auto; background: var(--paper-2); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.6); padding: 10px; }
+  .lblpick input[type=search] { width: 100%; min-height: 38px; margin-bottom: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; }
+  .lblist { max-height: 230px; overflow: auto; }
+  .lblrow { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 500; } .lblrow:hover { background: rgba(37,169,234,.1); }
+  .lblrow input { width: auto; min-height: 0; flex: none; } .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid rgba(255,255,255,.2); }
+  .lblnew { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; } .lblfoot { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; font-size: 0.84rem; } .lblfoot a { color: var(--cyan-ink); }
+  .pal { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; } .sw { width: 100%; aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255,255,255,.12); cursor: pointer; padding: 0; min-height: 0; } .sw.on { outline: 3px solid var(--cyan); outline-offset: 1px; }
+  .lblm { display: flex; align-items: center; gap: 10px; padding-top: 9px; padding-bottom: 9px; border-bottom: 1px solid var(--line); } .lblm:last-child { border-bottom: 0; }
+  .swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,.18); cursor: pointer; padding: 0; min-height: 0; flex: none; }
+  .lblfilter { min-height: 36px; }
+  .biz { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; } .chip .dot { vertical-align: -1px; }
   @media (max-width: 560px) { .modal .grid2, .modal .grid3 { grid-template-columns: 1fr; } .ax .monthbars { gap: 4px; } .ax .mbv { display: none; } .ax .timeline li { grid-template-columns: 1fr; gap: 0; } }
   @media print { .tabs, .adm-top, .no-print, .toast { display: none !important; } .adm { padding: 0; max-width: none; } .docwrap { padding: 0; background: #fff; } body { background: #fff !important; } .split { display: block; } }
 </style>
@@ -320,6 +342,7 @@
 <script src="../js/invoice-doc.js"></script>
 <script src="crm.js"></script>
 <script src="billing.js"></script>
+<script src="ledger.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

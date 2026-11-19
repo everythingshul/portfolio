@@ -44,7 +44,7 @@
       const sel = $('c-tag'); const cur = state.tag;
       sel.innerHTML = '<option value="">All tags</option>' + d.tags.map((t) => `<option value="${esc(t)}"${t === cur ? ' selected' : ''}>${esc(t)}</option>`).join('');
       if (!d.customers.length) { box.innerHTML = `<div class="aempty">${state.q || state.status || state.tag ? 'No customers match.' : 'No customers yet. Add one, import your Wix contacts, or wait for the first website lead.'}</div>`; return; }
-      box.innerHTML = `<div class="tscroll"><table class="atable clickable"><thead><tr><th>Customer</th><th>Contact</th><th>Status</th><th class="n">Owes</th><th class="n">Paid to date</th><th>Last activity</th></tr></thead><tbody>${d.customers.map((c) => `<tr data-id="${esc(c.id)}">
+      box.innerHTML = `<div class="tscroll"><table class="atable clickable"><thead><tr><th>Customer</th><th>Contact</th><th>Status</th><th class="n">Owes</th><th class="n">Paid to date</th><th>Last activity</th></tr></thead><tbody>${d.customers.map((c) => `<tr data-id="${esc(c.id)}" data-lbl="customer:${esc(c.id)}">
         <td><strong>${esc(who(c))}</strong>${sub(c) ? `<div class="subtle">${esc(sub(c))}</div>` : ''}${c.tags ? `<div class="tags">${c.tags.split(',').map((t) => `<span class="tag">${esc(t.trim())}</span>`).join('')}</div>` : ''}</td>
         <td>${esc(c.email)}${c.phone ? `<div class="subtle">${esc(c.phone)}</div>` : ''}</td><td>${badge(c.status)}</td>
         <td class="n">${c.balance ? `<strong>${esc(money(c.balance))}</strong>` : '—'}</td><td class="n">${c.paid_total ? esc(money(c.paid_total)) : '—'}</td><td class="subtle">${c.last_activity ? ago(c.last_activity) : '—'}</td></tr>`).join('')}</tbody></table></div>
@@ -72,6 +72,7 @@
         <button class="small-btn" id="edit">Edit</button>
         <button class="small-btn" id="newq">New quote</button>
         <button class="small-btn primary" id="newi">+ New invoice</button></div>
+      <div id="lblbar" class="lblbar"></div>
       <div class="kpis">
         <div class="kpi"><div class="kv">${esc(money(s.billed))}</div><div class="kl">Billed</div></div>
         <div class="kpi"><div class="kv">${esc(money(s.paid))}</div><div class="kl">Paid</div></div>
@@ -105,6 +106,7 @@
           <section class="acard"><h3>Manage</h3><div class="row"><button class="small-btn" id="newr">New repeating invoice</button><button class="small-btn danger" id="del">Delete customer</button></div></section>
         </aside></div>`;
     $('back').addEventListener('click', () => { history.replaceState(null, '', '#customers'); list(); });
+    if (window.ESLabels) window.ESLabels.bar($('lblbar'), 'customer', c.id);
     $('edit').addEventListener('click', () => customerForm(c, () => open(id)));
     $('newi').addEventListener('click', () => window.ESBilling.newInvoice({ customer_id: id, kind: 'invoice' }));
     $('newq').addEventListener('click', () => window.ESBilling.newInvoice({ customer_id: id, kind: 'quote' }));
